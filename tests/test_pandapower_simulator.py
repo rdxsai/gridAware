@@ -43,3 +43,28 @@ def test_pandapower_simulator_resolves_case33bw_spike_with_local_flexibility() -
     ]
     assert result["diff"]["remaining_violations"] == []
     assert bundle.grid_state.data_centers[0].load_mw == 0.5
+
+
+def test_pandapower_simulator_hard_spike_single_action_is_partial() -> None:
+    bundle = load_agent_scenario("case33bw_data_center_spike_hard")
+    result = simulate_action_intent_on_pandapower(
+        bundle,
+        ActionIntent(
+            type="dispatch_battery",
+            battery_id="BAT_A",
+            target_dc="DC_A",
+            mw=0.25,
+        ),
+    )
+
+    assert result["power_flow_converged"] is True
+    assert result["after_state"]["scenario_id"] == "case33bw_data_center_spike_hard"
+    assert result["diff"]["score_change"]["delta"] > 0
+    assert result["diff"]["resolved_violations"] == []
+    assert {
+        (violation["type"], violation["element_id"])
+        for violation in result["diff"]["remaining_violations"]
+    } == {
+        ("line_overload", "line_25"),
+        ("voltage_low", "DC_A"),
+    }

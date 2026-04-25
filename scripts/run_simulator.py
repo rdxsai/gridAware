@@ -14,6 +14,9 @@ def main() -> None:
         "--scenario",
         default="mv_data_center_spike",
         choices=[
+            "baseline_case33bw",
+            "case33bw_data_center_spike",
+            "case33bw_data_center_spike_hard",
             "mv_data_center_spike",
             "mv_renewable_drop",
             "mv_line_constraint",

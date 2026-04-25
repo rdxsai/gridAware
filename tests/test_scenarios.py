@@ -59,3 +59,25 @@ def test_case33bw_data_center_spike_has_clear_documented_stress() -> None:
         violation.type == "voltage_low" and violation.element_id == "DC_A"
         for violation in state.violations
     )
+
+
+def test_case33bw_data_center_spike_hard_is_tougher_than_default_spike() -> None:
+    easy = load_agent_grid("case33bw_data_center_spike")
+    hard = load_agent_grid("case33bw_data_center_spike_hard")
+
+    easy_line_25 = next(line for line in easy.line_loadings if line.line == "line_25")
+    hard_line_25 = next(line for line in hard.line_loadings if line.line == "line_25")
+    easy_dc_a = next(voltage for voltage in easy.bus_voltages if voltage.bus == "DC_A")
+    hard_dc_a = next(voltage for voltage in hard.bus_voltages if voltage.bus == "DC_A")
+
+    assert hard.metadata is not None
+    assert hard.metadata.scenario_type == "data_center_demand_spike_hard"
+    assert any(
+        "Limited DC_A flexible load to 0.25 MW" in item for item in hard.metadata.modifications
+    )
+    assert hard_line_25.loading_percent > easy_line_25.loading_percent
+    assert hard_dc_a.vm_pu < easy_dc_a.vm_pu
+    assert hard.data_centers[0].load_mw == 0.75
+    assert hard.data_centers[0].flexible_mw == 0.25
+    assert hard.batteries[0].available_mw == 0.25
+    assert hard.local_generators[0].available_headroom_mw == 0.25

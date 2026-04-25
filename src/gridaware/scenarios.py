@@ -22,6 +22,7 @@ from gridaware.models import (
 AgentGridScenario = Literal[
     "baseline_case33bw",
     "case33bw_data_center_spike",
+    "case33bw_data_center_spike_hard",
     "mv_data_center_spike",
     "mv_renewable_drop",
     "mv_line_constraint",
@@ -124,6 +125,8 @@ def _build_benchmark_grid(
         return _build_case33bw_baseline()
     if scenario_id == "case33bw_data_center_spike":
         return _build_case33bw_data_center_spike()
+    if scenario_id == "case33bw_data_center_spike_hard":
+        return _build_case33bw_data_center_spike_hard()
     if scenario_id == "lv_edge_data_center":
         return _build_cigre_lv_grid()
     return _build_cigre_mv_grid(scenario_id)
@@ -228,6 +231,86 @@ def _build_case33bw_data_center_spike() -> tuple[
         data_centers,
         [Battery(id="BAT_A", zone="feeder_tail", available_mw=0.50)],
         [LocalGenerator(id="GEN_A", zone="feeder_tail", available_headroom_mw=0.50)],
+        ALLOWED_DATA_CENTER_ACTIONS.copy(),
+        metadata,
+    )
+
+
+def _build_case33bw_data_center_spike_hard() -> tuple[
+    pp.pandapowerNet,
+    list[DataCenterSpec],
+    list[Battery],
+    list[LocalGenerator],
+    list[str],
+    ScenarioMetadata,
+]:
+    net = pn.case33bw()
+    net.ext_grid.at[0, "vm_pu"] = 1.04
+    net.line.loc[net.line.in_service, "max_i_ka"] = 0.40
+
+    data_centers = [
+        DataCenterSpec(
+            data_center_id="DC_A",
+            bus=32,
+            zone="feeder_tail",
+            pp_load_mw=0.75,
+            pp_q_mvar=0.2625,
+            display_load_mw=0.75,
+            flexible_mw=0.25,
+            max_load_mw=0.90,
+        ),
+        DataCenterSpec(
+            data_center_id="DC_B",
+            bus=21,
+            zone="mid_feeder",
+            pp_load_mw=0.35,
+            pp_q_mvar=0.112,
+            display_load_mw=0.35,
+            flexible_mw=0.10,
+            max_load_mw=0.70,
+        ),
+    ]
+
+    for data_center in data_centers:
+        data_center.load_index = pp.create_load(
+            net,
+            bus=data_center.bus,
+            p_mw=data_center.pp_load_mw,
+            q_mvar=data_center.pp_q_mvar,
+            name=data_center.data_center_id,
+        )
+
+    net.line.at[24, "max_i_ka"] = 0.08
+    metadata = ScenarioMetadata(
+        scenario_id="case33bw_data_center_spike_hard",
+        base_network="pandapower.networks.case33bw()",
+        scenario_type="data_center_demand_spike_hard",
+        purpose=(
+            "Stress-test the current single-action agent loop under a tougher downstream "
+            "data-center load condition."
+        ),
+        modifications=[
+            "Started from pandapower.networks.case33bw().",
+            "Set the substation voltage setpoint to 1.04 pu to represent normal feeder voltage support before the spike.",
+            "Set active feeder line ampacity to 0.40 kA because the benchmark default ampacity is not calibrated for operational loading comparisons.",
+            "Added DC_A at downstream bus 32 with 0.75 MW / 0.2625 MVAr demand.",
+            "Limited DC_A flexible load to 0.25 MW so one curtailment action cannot remove the full data-center demand.",
+            "Added DC_B at mid-feeder bus 21 with 0.35 MW / 0.112 MVAr demand and 0.35 MW receiving headroom.",
+            "Added BAT_A in the feeder_tail zone with 0.25 MW available.",
+            "Added GEN_A in the feeder_tail zone with 0.25 MW available headroom.",
+            "Set line_25 ampacity to 0.08 kA to represent a constrained upstream feeder corridor.",
+        ],
+        limitations=[
+            "Benchmark-based synthetic scenario, not a real utility feeder.",
+            "Data-center and flexibility assets are synthetic additions.",
+            "This variant is intentionally harder and may require cumulative actions, which the current simulator does not yet optimize.",
+        ],
+    )
+    return (
+        net,
+        data_centers,
+        [Battery(id="BAT_A", zone="feeder_tail", available_mw=0.25)],
+        [LocalGenerator(id="GEN_A", zone="feeder_tail", available_headroom_mw=0.25)],
         ALLOWED_DATA_CENTER_ACTIONS.copy(),
         metadata,
     )

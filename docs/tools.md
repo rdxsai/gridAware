@@ -170,6 +170,8 @@ Initial variants:
 - `baseline_case33bw`: untouched `pandapower.networks.case33bw()` benchmark for comparison.
 - `case33bw_data_center_spike`: `case33bw` benchmark with documented downstream
   data-center load, local flexibility resources, and a constrained feeder corridor.
+- `case33bw_data_center_spike_hard`: tougher `case33bw` data-center spike with smaller
+  per-action flexibility limits, intended to expose partial single-action mitigations.
 - `mv_data_center_spike`: CIGRE MV benchmark with data center load and a constrained corridor.
 - `mv_renewable_drop`: CIGRE MV benchmark with reduced DER output.
 - `mv_line_constraint`: CIGRE MV benchmark with a tighter line constraint.

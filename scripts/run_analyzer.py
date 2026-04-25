@@ -5,12 +5,16 @@ import json
 
 from gridaware.orchestrator import GridOrchestrator
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the gridAware analyzer agent.")
     parser.add_argument(
         "--scenario",
         default="mv_data_center_spike",
         choices=[
+            "baseline_case33bw",
+            "case33bw_data_center_spike",
+            "case33bw_data_center_spike_hard",
             "mv_data_center_spike",
             "mv_renewable_drop",
             "mv_line_constraint",
