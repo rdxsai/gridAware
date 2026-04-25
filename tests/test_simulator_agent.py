@@ -2,7 +2,11 @@ import json
 from types import SimpleNamespace
 
 from gridaware.agents.models import PlannerReport
-from gridaware.agents.simulator import run_simulator_agent, simulator_tools
+from gridaware.agents.simulator import (
+    _simulation_candidates,
+    run_simulator_agent,
+    simulator_tools,
+)
 from gridaware.scenarios import load_agent_scenario
 from gridaware.tool_executor import GridToolRuntime
 
@@ -162,3 +166,73 @@ def test_simulator_agent_uses_action_sequence_tool() -> None:
     assert [tool["name"] for tool in simulator_tools()] == ["simulate_candidate_sequences"]
     assert result.trace.tool_calls[0].name == "simulate_candidate_sequences"
     assert result.report.best_candidate_rank == 1
+
+
+def test_simulator_translates_conceptual_generation_to_backend_action() -> None:
+    planner_report = PlannerReport.model_validate(
+        {
+            "scenario_id": "case33bw_data_center_spike_hard",
+            "planning_summary": "Use local generation near DC_A.",
+            "primary_objectives": ["Reduce line_25 loading."],
+            "candidates": [
+                {
+                    "rank": 2,
+                    "action_sequence": [
+                        {
+                            "type": "adjust_generation",
+                            "intent_summary": "Dispatch local generation near DC_A.",
+                            "from_dc": None,
+                            "to_dc": None,
+                            "battery_id": None,
+                            "generator_id": "GEN_A",
+                            "target_dc": None,
+                            "dc": None,
+                            "resource_id": "GEN_A",
+                            "target_bus": "DC_A",
+                            "q_mvar": None,
+                            "target_element": None,
+                            "control_asset": "GEN_A",
+                            "setpoint": 0.25,
+                            "units": "MW",
+                            "mw": 0.25,
+                        }
+                    ],
+                    "validation_passed": False,
+                    "validation_passed_checks": [],
+                    "target_violations": ["line_25"],
+                    "feasibility_checks": ["GEN_A has 0.25 MW headroom."],
+                    "expected_effect": "Reduce upstream imports.",
+                    "rationale": "Generation near the tail should relieve the constrained corridor.",
+                    "risk_notes": [],
+                    "planner_confidence": "medium",
+                }
+            ],
+            "rejected_options": [],
+            "requires_simulation": True,
+        }
+    )
+
+    candidates, unsupported = _simulation_candidates(planner_report)
+
+    assert unsupported == []
+    assert candidates == [
+        {
+            "candidate_id": "candidate_2",
+            "rank": 2,
+            "action_intents": [
+                {
+                    "type": "increase_local_generation",
+                    "from_dc": None,
+                    "to_dc": None,
+                    "battery_id": None,
+                    "generator_id": "GEN_A",
+                    "target_dc": "DC_A",
+                    "dc": None,
+                    "resource_id": None,
+                    "target_bus": None,
+                    "q_mvar": None,
+                    "mw": 0.25,
+                }
+            ],
+        }
+    ]

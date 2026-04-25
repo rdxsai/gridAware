@@ -4,7 +4,13 @@ import json
 from typing import Any
 
 from gridaware.agent_tools import responses_tool_definitions
-from gridaware.agents.models import PlannerReport, SimulatorReport, SimulatorRunResult
+from gridaware.agents.models import (
+    PlannerActionIntent,
+    PlannerCandidate,
+    PlannerReport,
+    SimulatorReport,
+    SimulatorRunResult,
+)
 from gridaware.agents.prompts import SIMULATOR_SYSTEM_PROMPT
 from gridaware.agents.responses_runner import (
     DEFAULT_AGENT_MODEL,
@@ -55,13 +61,168 @@ def run_simulator_agent(
 
 
 def _simulator_user_prompt(planner_report: PlannerReport) -> str:
+    simulation_candidates, unsupported_candidates = _simulation_candidates(planner_report)
     return (
         "Simulate every candidate in this PlannerReport. "
-        "Call simulate_candidate_sequences exactly once with all PlannerReport.candidates. "
-        "Each candidate must include candidate_id, rank, and action_intents. "
-        "Use candidate_id values like candidate_1, candidate_2, matching each candidate rank. "
+        "Call simulate_candidate_sequences exactly once using the exact simulation_candidates "
+        "payload below as the tool arguments. "
         "Do not simulate only the top-ranked candidate unless this PlannerReport contains only one "
         "candidate. Do not return final JSON until every candidate has a simulation result or "
-        "validation failure.\n\n"
-        f"{json.dumps(planner_report.model_dump(mode='json'), indent=2)}"
+        "validation failure. If unsupported_candidates is not empty, report those candidates as "
+        "failed because they could not be translated to executable backend action_intents.\n\n"
+        "Original PlannerReport:\n"
+        f"{json.dumps(planner_report.model_dump(mode='json'), indent=2)}\n\n"
+        "Tool arguments for simulate_candidate_sequences:\n"
+        f"{json.dumps({'candidates': simulation_candidates}, indent=2)}\n\n"
+        "Unsupported candidates:\n"
+        f"{json.dumps(unsupported_candidates, indent=2)}"
     )
+
+
+def _simulation_candidates(
+    planner_report: PlannerReport,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    simulation_candidates: list[dict[str, Any]] = []
+    unsupported_candidates: list[dict[str, Any]] = []
+
+    for candidate in planner_report.candidates:
+        action_intents: list[dict[str, Any]] = []
+        unsupported_reasons: list[str] = []
+        for intent in candidate.action_sequence:
+            translated = _to_backend_action_intent(intent)
+            if translated is None:
+                unsupported_reasons.append(
+                    f"{intent.type}: no executable backend mapping for this planner action"
+                )
+            else:
+                action_intents.append(translated)
+
+        if unsupported_reasons:
+            unsupported_candidates.append(
+                {
+                    "candidate_id": _candidate_id(candidate),
+                    "rank": candidate.rank,
+                    "unsupported_reasons": unsupported_reasons,
+                }
+            )
+            continue
+
+        simulation_candidates.append(
+            {
+                "candidate_id": _candidate_id(candidate),
+                "rank": candidate.rank,
+                "action_intents": action_intents,
+            }
+        )
+
+    return simulation_candidates, unsupported_candidates
+
+
+def _to_backend_action_intent(intent: PlannerActionIntent) -> dict[str, Any] | None:
+    action_type = _backend_action_type(intent.type)
+    target_dc = _target_dc(intent)
+
+    match action_type:
+        case "shift_data_center_load":
+            if not intent.from_dc or not intent.to_dc or intent.mw is None:
+                return None
+            return _action_payload(
+                action_type,
+                from_dc=intent.from_dc,
+                to_dc=intent.to_dc,
+                mw=intent.mw,
+            )
+        case "dispatch_battery":
+            battery_id = intent.battery_id or _asset_id(intent)
+            if not battery_id or not target_dc or intent.mw is None:
+                return None
+            return _action_payload(
+                action_type,
+                battery_id=battery_id,
+                target_dc=target_dc,
+                mw=intent.mw,
+            )
+        case "increase_local_generation":
+            generator_id = intent.generator_id or _asset_id(intent)
+            if not generator_id or not target_dc or intent.mw is None:
+                return None
+            return _action_payload(
+                action_type,
+                generator_id=generator_id,
+                target_dc=target_dc,
+                mw=intent.mw,
+            )
+        case "curtail_flexible_load":
+            dc = intent.dc or target_dc
+            if not dc or intent.mw is None:
+                return None
+            return _action_payload(action_type, dc=dc, mw=intent.mw)
+        case "adjust_reactive_support":
+            resource_id = intent.resource_id or _asset_id(intent)
+            target_bus = intent.target_bus or intent.target_element or target_dc
+            if not resource_id or not target_bus or intent.q_mvar is None:
+                return None
+            return _action_payload(
+                action_type,
+                resource_id=resource_id,
+                target_bus=target_bus,
+                q_mvar=intent.q_mvar,
+            )
+    return None
+
+
+def _backend_action_type(action_type: str) -> str | None:
+    aliases = {
+        "shift_data_center_load": "shift_data_center_load",
+        "shift_load": "shift_data_center_load",
+        "load_shift": "shift_data_center_load",
+        "dispatch_battery": "dispatch_battery",
+        "battery_dispatch": "dispatch_battery",
+        "dispatch_storage": "dispatch_battery",
+        "adjust_storage": "dispatch_battery",
+        "increase_local_generation": "increase_local_generation",
+        "adjust_generation": "increase_local_generation",
+        "dispatch_generator": "increase_local_generation",
+        "dispatch_local_generation": "increase_local_generation",
+        "curtail_flexible_load": "curtail_flexible_load",
+        "adjust_load": "curtail_flexible_load",
+        "curtail_load": "curtail_flexible_load",
+        "load_curtailment": "curtail_flexible_load",
+        "adjust_reactive_support": "adjust_reactive_support",
+        "reactive_support": "adjust_reactive_support",
+        "inject_reactive_power": "adjust_reactive_support",
+    }
+    return aliases.get(action_type)
+
+
+def _action_payload(action_type: str, **updates: Any) -> dict[str, Any]:
+    payload = {
+        "type": action_type,
+        "from_dc": None,
+        "to_dc": None,
+        "battery_id": None,
+        "generator_id": None,
+        "target_dc": None,
+        "dc": None,
+        "resource_id": None,
+        "target_bus": None,
+        "q_mvar": None,
+        "mw": None,
+    }
+    payload.update(updates)
+    return payload
+
+
+def _target_dc(intent: PlannerActionIntent) -> str | None:
+    for value in (intent.target_dc, intent.dc, intent.target_bus, intent.target_element):
+        if value and value.startswith("DC_"):
+            return value
+    return None
+
+
+def _asset_id(intent: PlannerActionIntent) -> str | None:
+    return intent.control_asset or intent.resource_id
+
+
+def _candidate_id(candidate: PlannerCandidate) -> str:
+    return f"candidate_{candidate.rank}"
