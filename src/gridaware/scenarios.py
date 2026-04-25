@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import Literal
 
 import pandapower as pp
@@ -25,34 +26,55 @@ AgentGridScenario = Literal[
 ]
 
 
+@dataclass
 class DataCenterSpec:
-    def __init__(
-        self,
-        data_center_id: str,
-        bus: int,
-        zone: str,
-        pp_load_mw: float,
-        pp_q_mvar: float,
-        display_load_mw: float,
-        flexible_mw: float,
-        max_load_mw: float,
-    ) -> None:
-        self.data_center_id = data_center_id
-        self.bus = bus
-        self.zone = zone
-        self.pp_load_mw = pp_load_mw
-        self.pp_q_mvar = pp_q_mvar
-        self.display_load_mw = display_load_mw
-        self.flexible_mw = flexible_mw
-        self.max_load_mw = max_load_mw
+    data_center_id: str
+    bus: int
+    zone: str
+    pp_load_mw: float
+    pp_q_mvar: float
+    display_load_mw: float
+    flexible_mw: float
+    max_load_mw: float
+    load_index: int | None = None
+
+    @property
+    def pp_mw_per_display_mw(self) -> float:
+        return self.pp_load_mw / self.display_load_mw
+
+    @property
+    def pp_q_mvar_per_display_mw(self) -> float:
+        return self.pp_q_mvar / self.display_load_mw
+
+
+@dataclass
+class ScenarioBundle:
+    scenario_id: AgentGridScenario
+    net: pp.pandapowerNet
+    data_centers: list[DataCenterSpec]
+    grid_state: GridState
 
 
 def load_agent_grid(scenario_id: AgentGridScenario = "mv_data_center_spike") -> GridState:
     """Build a benchmark pandapower grid variant and return the agent-facing state."""
 
+    return deepcopy(load_agent_scenario(scenario_id).grid_state)
+
+
+def load_agent_scenario(
+    scenario_id: AgentGridScenario = "mv_data_center_spike",
+) -> ScenarioBundle:
+    """Build a benchmark pandapower grid variant and keep the raw net for simulation."""
+
     net, data_centers = _build_benchmark_grid(scenario_id)
     pp.runpp(net, numba=False, max_iteration=30)
-    return _grid_state_from_pandapower(net, scenario_id, data_centers)
+    grid_state = _grid_state_from_pandapower(net, scenario_id, data_centers)
+    return ScenarioBundle(
+        scenario_id=scenario_id,
+        net=net,
+        data_centers=data_centers,
+        grid_state=grid_state,
+    )
 
 
 def load_demo_scenario() -> GridState:
@@ -97,7 +119,7 @@ def _build_cigre_mv_grid(
     ]
 
     for data_center in data_centers:
-        pp.create_load(
+        data_center.load_index = pp.create_load(
             net,
             bus=data_center.bus,
             p_mw=data_center.pp_load_mw,
@@ -143,7 +165,7 @@ def _build_cigre_lv_grid() -> tuple[pp.pandapowerNet, list[DataCenterSpec]]:
     ]
 
     for data_center in data_centers:
-        pp.create_load(
+        data_center.load_index = pp.create_load(
             net,
             bus=data_center.bus,
             p_mw=data_center.pp_load_mw,

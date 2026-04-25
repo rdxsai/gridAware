@@ -119,3 +119,44 @@ class PlannerRunResult(BaseModel):
 
     report: PlannerReport
     trace: AgentRunTrace
+
+
+class SimulatedActionResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_rank: int
+    action_intent: PlannerActionIntent
+    power_flow_converged: bool
+    successful_changes: list[str]
+    failed_changes: list[str]
+    grid_changes_summary: str
+    remaining_violations: list[str]
+    final_grid_health_score: int | None
+
+
+class FinalGridStateSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenario_id: str
+    grid_health_score: int
+    remaining_violations: list[str]
+    max_line_loading_percent: float
+    min_bus_voltage_pu: float
+
+
+class SimulatorReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenario_id: str
+    simulation_summary: str
+    action_results: list[SimulatedActionResult]
+    best_candidate_rank: int | None
+    final_grid_status: str
+    final_grid_state: FinalGridStateSummary | None
+
+
+class SimulatorRunResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    report: SimulatorReport
+    trace: AgentRunTrace

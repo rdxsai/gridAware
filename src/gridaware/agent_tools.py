@@ -109,6 +109,26 @@ def responses_tool_definitions() -> list[dict[str, Any]]:
         },
         {
             "type": "function",
+            "name": "simulate_action_intent",
+            "description": (
+                "Run a pandapower-backed simulation for one validated action_intent without "
+                "mutating the active grid. Returns before/after grid state and diffs."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action_intent": {
+                        **_action_intent_schema(),
+                        "description": "Validated structured mitigation action to simulate.",
+                    }
+                },
+                "required": ["action_intent"],
+                "additionalProperties": False,
+            },
+            "strict": True,
+        },
+        {
+            "type": "function",
             "name": "evaluate_action_result",
             "description": (
                 "Evaluate a previously simulated action against deterministic grid safety criteria."

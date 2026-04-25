@@ -8,15 +8,26 @@ from pydantic import ValidationError
 
 from gridaware.actions import propose_grid_actions, validate_action_intent_for_planner
 from gridaware.models import ActionIntent, Evaluation, GridState
-from gridaware.scenarios import load_demo_scenario
+from gridaware.pandapower_simulator import simulate_action_intent_on_pandapower
+from gridaware.scenarios import ScenarioBundle, load_demo_scenario
 from gridaware.simulator import evaluate_result, get_grid_state, simulate_action, simulate_action_intent
 
 
 class GridToolRuntime:
     """Stateful executor for Responses API function calls."""
 
-    def __init__(self, initial_state: GridState | None = None) -> None:
-        self.original_state = deepcopy(initial_state or load_demo_scenario())
+    def __init__(
+        self,
+        initial_state: GridState | None = None,
+        scenario_bundle: ScenarioBundle | None = None,
+    ) -> None:
+        self.scenario_bundle = deepcopy(scenario_bundle)
+        if initial_state is not None:
+            self.original_state = deepcopy(initial_state)
+        elif scenario_bundle is not None:
+            self.original_state = deepcopy(scenario_bundle.grid_state)
+        else:
+            self.original_state = deepcopy(load_demo_scenario())
         self.active_state = deepcopy(self.original_state)
         self._simulations = {}
         self._evaluations: dict[str, Evaluation] = {}
@@ -37,6 +48,8 @@ class GridToolRuntime:
                     payload = self.validate_action_intent(args["action_intent"])
                 case "simulate_action":
                     payload = self.simulate_action(args["action_id"], args["action_intent"])
+                case "simulate_action_intent":
+                    payload = self.simulate_action_intent(args["action_intent"])
                 case "evaluate_action_result":
                     payload = self.evaluate_action_result(args["action_id"])
                 case "apply_action":
@@ -101,6 +114,14 @@ class GridToolRuntime:
 
         self._simulations[result.action_id] = result
         return {"ok": True, "simulation": result.model_dump(mode="json")}
+
+    def simulate_action_intent(self, action_intent: dict[str, Any]) -> dict[str, Any]:
+        if self.scenario_bundle is None:
+            raise ValueError("simulate_action_intent requires a scenario bundle")
+        return simulate_action_intent_on_pandapower(
+            self.scenario_bundle,
+            ActionIntent.model_validate(action_intent),
+        )
 
     def validate_action_intent(self, action_intent: dict[str, Any]) -> dict[str, Any]:
         validation = validate_action_intent_for_planner(

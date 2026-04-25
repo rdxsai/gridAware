@@ -92,6 +92,29 @@ Returns deterministic feasibility results: `valid`, `passed_checks`, `failed_che
 `repair_guidance`, and a normalized intent when valid. The planner should call this before including
 an action intent in its final report.
 
+### `simulate_action_intent`
+
+Parameters:
+
+```json
+{
+  "action_intent": {
+    "type": "curtail_flexible_load",
+    "from_dc": null,
+    "to_dc": null,
+    "battery_id": null,
+    "generator_id": null,
+    "target_dc": null,
+    "dc": "DC_A",
+    "mw": 8
+  }
+}
+```
+
+Runs a pandapower-backed simulation on a copy of the baseline scenario network. Returns whether power
+flow converged, the baseline state, the after state, and before/after diffs. It does not apply the
+action to the active grid.
+
 ### `evaluate_action_result`
 
 Parameters:

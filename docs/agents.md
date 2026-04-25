@@ -72,6 +72,41 @@ GridOrchestrator.run_planner(...)
   -> validate PlannerReport
 ```
 
+## Simulator Agent
+
+Purpose: simulate validated planner action intents and explain before/after grid changes.
+
+Allowed tools:
+
+- `simulate_action_intent`
+
+Forbidden behavior:
+
+- Do not invent new actions.
+- Do not apply actions to the active grid.
+- Do not call planner, validation, evaluation, apply, or compare tools.
+
+Output:
+
+- `SimulatorReport` from `src/gridaware/agents/models.py`
+- Each candidate result describes successful changes, failed changes, remaining violations, and final
+  grid status.
+- `final_grid_state` is the simulated `after_state` for the best candidate, not an applied active
+  grid state.
+
+Runtime path:
+
+```text
+GridOrchestrator.run_simulator(...)
+  -> load_agent_scenario(...)
+  -> GridToolRuntime(...)
+  -> run_analyzer_agent(...)
+  -> run_planner_agent(...)
+  -> run_simulator_agent(...)
+  -> simulator calls simulate_action_intent for planner candidates
+  -> validate SimulatorReport
+```
+
 ## Deterministic Orchestrator
 
 `GridOrchestrator` is currently deterministic code, not an LLM. It selects the scenario, creates the
@@ -82,4 +117,5 @@ Run manually:
 ```bash
 uv run python scripts/run_analyzer.py --scenario mv_data_center_spike
 uv run python scripts/run_planner.py --scenario mv_data_center_spike
+uv run python scripts/run_simulator.py --scenario mv_data_center_spike
 ```

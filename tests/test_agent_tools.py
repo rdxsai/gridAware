@@ -1,6 +1,7 @@
 import json
 
 from gridaware.agent_tools import responses_tool_definitions
+from gridaware.scenarios import load_agent_scenario
 from gridaware.tool_executor import GridToolRuntime
 
 
@@ -13,6 +14,7 @@ def test_responses_tool_definitions_are_strict() -> None:
         "get_available_controls",
         "validate_action_intent",
         "simulate_action",
+        "simulate_action_intent",
         "evaluate_action_result",
         "apply_action",
         "compare_grid_states",
@@ -125,6 +127,33 @@ def test_tool_runtime_validates_action_intent() -> None:
     assert valid["validation"]["normalized_action_intent"]["to_dc"] == "DC_B"
     assert invalid["validation"]["valid"] is False
     assert invalid["validation"]["failed_checks"]
+
+
+def test_tool_runtime_simulates_action_intent_with_pandapower_bundle() -> None:
+    runtime = GridToolRuntime(scenario_bundle=load_agent_scenario())
+
+    result = json.loads(
+        runtime.execute(
+            "simulate_action_intent",
+            {
+                "action_intent": {
+                    "type": "curtail_flexible_load",
+                    "from_dc": None,
+                    "to_dc": None,
+                    "battery_id": None,
+                    "generator_id": None,
+                    "target_dc": None,
+                    "dc": "DC_A",
+                    "mw": 8.0,
+                }
+            },
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["power_flow_converged"] is True
+    assert result["after_state"]["scenario_id"] == "mv_data_center_spike"
+    assert result["diff"]["voltage_changes"]
 
 
 def test_tool_runtime_rejects_infeasible_agent_intent() -> None:
