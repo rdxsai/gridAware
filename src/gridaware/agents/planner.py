@@ -46,7 +46,7 @@ def run_planner_agent(
         max_tool_rounds=5,
     )
     report = PlannerReport.model_validate_json(result.output_text)
-    return PlannerRunResult(report=report, trace=result.trace)
+    return PlannerRunResult(report=_normalize_planner_report(report), trace=result.trace)
 
 
 def _planner_user_prompt(analyzer_report: AnalyzerReport) -> str:
@@ -55,3 +55,49 @@ def _planner_user_prompt(analyzer_report: AnalyzerReport) -> str:
         "Call get_grid_state and get_available_controls before returning the final JSON.\n\n"
         f"{json.dumps(analyzer_report.model_dump(mode='json'), indent=2)}"
     )
+
+
+def _normalize_planner_report(report: PlannerReport) -> PlannerReport:
+    candidates = []
+    for candidate in report.candidates:
+        intent = candidate.action_intent
+        match intent.type:
+            case "shift_data_center_load":
+                intent = intent.model_copy(
+                    update={
+                        "battery_id": None,
+                        "generator_id": None,
+                        "target_dc": None,
+                        "dc": None,
+                    }
+                )
+            case "dispatch_battery":
+                intent = intent.model_copy(
+                    update={
+                        "from_dc": None,
+                        "to_dc": None,
+                        "generator_id": None,
+                        "dc": None,
+                    }
+                )
+            case "increase_local_generation":
+                intent = intent.model_copy(
+                    update={
+                        "from_dc": None,
+                        "to_dc": None,
+                        "battery_id": None,
+                        "dc": None,
+                    }
+                )
+            case "curtail_flexible_load":
+                intent = intent.model_copy(
+                    update={
+                        "from_dc": None,
+                        "to_dc": None,
+                        "battery_id": None,
+                        "generator_id": None,
+                        "target_dc": None,
+                    }
+                )
+        candidates.append(candidate.model_copy(update={"action_intent": intent}))
+    return report.model_copy(update={"candidates": candidates})

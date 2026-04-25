@@ -80,6 +80,8 @@ Candidate guidance:
 - increase_local_generation requires generator_id, target_dc, and mw.
 - curtail_flexible_load requires dc and mw.
 - For non-applicable fields in action_intent, use null.
+- rejected_options must use exact constraints from the tool outputs. Do not invent thresholds or
+  reject actions using unsupported arithmetic.
 
 Return only JSON matching the requested schema.
 """.strip()

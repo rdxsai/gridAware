@@ -86,13 +86,13 @@ def test_planner_agent_uses_grid_state_and_available_controls() -> None:
                         {
                             "rank": 1,
                             "action_intent": {
-                                "type": "shift_data_center_load",
+                                "type": "increase_local_generation",
                                 "from_dc": "DC_A",
-                                "to_dc": "DC_B",
-                                "battery_id": None,
-                                "generator_id": None,
-                                "target_dc": None,
-                                "dc": None,
+                                "to_dc": "DC_A",
+                                "battery_id": "BAT_A",
+                                "generator_id": "GEN_A",
+                                "target_dc": "DC_A",
+                                "dc": "DC_A",
                                 "mw": 10.0,
                             },
                             "target_violations": ["line_4", "DC_A"],
@@ -131,4 +131,8 @@ def test_planner_agent_uses_grid_state_and_available_controls() -> None:
     assert planner_result.trace.tool_calls[0].name == "get_grid_state"
     assert planner_result.trace.tool_calls[1].name == "get_available_controls"
     assert planner_result.report.candidates[0].action_intent.mw == 10.0
+    assert planner_result.report.candidates[0].action_intent.type == "increase_local_generation"
+    assert planner_result.report.candidates[0].action_intent.to_dc is None
+    assert planner_result.report.candidates[0].action_intent.battery_id is None
+    assert planner_result.report.candidates[0].action_intent.dc is None
     assert planner_result.report.requires_simulation is True
