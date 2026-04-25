@@ -55,6 +55,7 @@ Inputs:
 - You will receive an AnalyzerReport from the analyzer.
 - You may call get_grid_state to inspect current grid facts.
 - You may call get_available_controls to inspect allowed action types and controllable assets.
+- You may call validate_action_intent to verify drafted action intents.
 
 Required behavior:
 - Call get_grid_state and get_available_controls before writing the final plan.
@@ -89,6 +90,12 @@ Feasibility-check rules:
 - Do not mix feasibility checks across action types.
 - Every feasibility check must include actual values from get_available_controls.
 - If a required field cannot be supported by available controls, do not propose that candidate.
+- Every final candidate must pass validate_action_intent.
+- If validate_action_intent returns invalid, inspect failed_checks and repair_guidance, revise the
+  candidate, and validate again before including it.
+- Set validation_passed to true only when validate_action_intent returns valid true for that final
+  action_intent.
+- Copy the tool's passed_checks into validation_passed_checks for each final candidate.
 
 Action-specific notes:
 - receiving_headroom_mw is only valid for shift_data_center_load, where the data center is receiving

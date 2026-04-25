@@ -69,6 +69,29 @@ No parameters.
 Returns the allowed mitigation action types and controllable assets. The planner uses this to reason
 about feasibility before proposing structured action intents.
 
+### `validate_action_intent`
+
+Parameters:
+
+```json
+{
+  "action_intent": {
+    "type": "shift_data_center_load",
+    "from_dc": "DC_A",
+    "to_dc": "DC_B",
+    "battery_id": null,
+    "generator_id": null,
+    "target_dc": null,
+    "dc": null,
+    "mw": 15
+  }
+}
+```
+
+Returns deterministic feasibility results: `valid`, `passed_checks`, `failed_checks`,
+`repair_guidance`, and a normalized intent when valid. The planner should call this before including
+an action intent in its final report.
+
 ### `evaluate_action_result`
 
 Parameters:

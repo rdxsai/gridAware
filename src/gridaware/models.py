@@ -88,6 +88,15 @@ class ActionValidation(BaseModel):
     action: Action | None = None
 
 
+class ActionIntentValidation(BaseModel):
+    valid: bool
+    action_intent: ActionIntent
+    normalized_action_intent: ActionIntent | None = None
+    passed_checks: list[str]
+    failed_checks: list[str]
+    repair_guidance: list[str]
+
+
 class LineLoadingChange(BaseModel):
     line: str
     before_percent: float

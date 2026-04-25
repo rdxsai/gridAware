@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from gridaware.models import Action, ActionIntent, ActionValidation, GridState
+from gridaware.models import Action, ActionIntent, ActionIntentValidation, ActionValidation, GridState
 
 
 def propose_grid_actions(state: GridState, target_violation: str | None = None) -> list[Action]:
@@ -84,6 +84,21 @@ def validate_action(state: GridState, action: Action) -> ActionValidation:
     return validate_action_intent(state, action_to_intent(action), action.action_id)
 
 
+def validate_action_intent_for_planner(
+    state: GridState,
+    intent: ActionIntent,
+) -> ActionIntentValidation:
+    match intent.type:
+        case "shift_data_center_load":
+            return _validate_shift_load_for_planner(state, intent)
+        case "dispatch_battery":
+            return _validate_dispatch_battery_for_planner(state, intent)
+        case "increase_local_generation":
+            return _validate_increase_generation_for_planner(state, intent)
+        case "curtail_flexible_load":
+            return _validate_curtail_load_for_planner(state, intent)
+
+
 def _stressed_data_center(state: GridState) -> str:
     low_voltage = min(state.bus_voltages, key=lambda voltage: voltage.vm_pu)
     return low_voltage.bus if low_voltage.bus.startswith("DC_") else "DC_A"
@@ -119,6 +134,50 @@ def _validate_shift_load(state: GridState, intent: ActionIntent, action_id: str)
     )
 
 
+def _validate_shift_load_for_planner(state: GridState, intent: ActionIntent) -> ActionIntentValidation:
+    passed: list[str] = []
+    failed: list[str] = []
+    repair: list[str] = []
+    source = _data_center(state, intent.from_dc) if intent.from_dc else None
+    target = _data_center(state, intent.to_dc) if intent.to_dc else None
+
+    if source:
+        passed.append(f"from_dc exists in data_centers: {source.id}")
+    else:
+        failed.append(f"from_dc exists in data_centers: {intent.from_dc}")
+        repair.append("Choose from_dc from available data_centers.")
+
+    if target:
+        passed.append(f"to_dc exists in data_centers: {target.id}")
+    else:
+        failed.append(f"to_dc exists in data_centers: {intent.to_dc}")
+        repair.append("Choose to_dc from available data_centers.")
+
+    if intent.from_dc and intent.to_dc and intent.from_dc != intent.to_dc:
+        passed.append(f"from_dc != to_dc: {intent.from_dc} != {intent.to_dc}")
+    else:
+        failed.append("from_dc != to_dc")
+        repair.append("Use different source and destination data centers.")
+
+    if source and intent.mw <= source.flexible_mw:
+        passed.append(f"mw <= from_dc.flexible_mw: {intent.mw:g} <= {source.flexible_mw:g}")
+    elif source:
+        failed.append(f"mw <= from_dc.flexible_mw: {intent.mw:g} > {source.flexible_mw:g}")
+        repair.append(f"Reduce mw to <= {source.flexible_mw:g}.")
+
+    if target:
+        headroom = target.max_load_mw - target.load_mw
+        if intent.mw <= headroom:
+            passed.append(f"mw <= to_dc.receiving_headroom_mw: {intent.mw:g} <= {headroom:g}")
+        else:
+            failed.append(f"mw <= to_dc.receiving_headroom_mw: {intent.mw:g} > {headroom:g}")
+            repair.append(f"Reduce mw to <= {headroom:g} or choose another destination.")
+
+    _check_positive_mw(intent, passed, failed, repair)
+    normalized = _normalized_shift_intent(source.id, target.id, intent.mw) if not failed and source and target else None
+    return _planner_validation(intent, normalized, passed, failed, repair)
+
+
 def _validate_dispatch_battery(state: GridState, intent: ActionIntent, action_id: str) -> ActionValidation:
     if not intent.battery_id or not intent.target_dc:
         return _invalid("dispatch_battery requires battery_id and target_dc")
@@ -143,6 +202,48 @@ def _validate_dispatch_battery(state: GridState, intent: ActionIntent, action_id
             estimated_cost=3.0,
         )
     )
+
+
+def _validate_dispatch_battery_for_planner(
+    state: GridState, intent: ActionIntent
+) -> ActionIntentValidation:
+    passed: list[str] = []
+    failed: list[str] = []
+    repair: list[str] = []
+    battery = next((item for item in state.batteries if item.id == intent.battery_id), None)
+    target = _data_center(state, intent.target_dc) if intent.target_dc else None
+
+    if battery:
+        passed.append(f"battery_id exists in batteries: {battery.id}")
+    else:
+        failed.append(f"battery_id exists in batteries: {intent.battery_id}")
+        repair.append("Choose battery_id from available batteries.")
+
+    if target:
+        passed.append(f"target_dc exists in data_centers: {target.id}")
+    else:
+        failed.append(f"target_dc exists in data_centers: {intent.target_dc}")
+        repair.append("Choose target_dc from available data_centers.")
+
+    if battery and intent.mw <= battery.available_mw:
+        passed.append(f"mw <= battery.available_mw: {intent.mw:g} <= {battery.available_mw:g}")
+    elif battery:
+        failed.append(f"mw <= battery.available_mw: {intent.mw:g} > {battery.available_mw:g}")
+        repair.append(f"Reduce mw to <= {battery.available_mw:g}.")
+
+    if battery and target and battery.zone == target.zone:
+        passed.append(f"battery.zone supports target_dc.zone: {battery.zone} == {target.zone}")
+    elif battery and target:
+        failed.append(f"battery.zone supports target_dc.zone: {battery.zone} != {target.zone}")
+        repair.append("Choose a battery in the target data center zone.")
+
+    _check_positive_mw(intent, passed, failed, repair)
+    normalized = (
+        _normalized_battery_intent(battery.id, target.id, intent.mw)
+        if not failed and battery and target
+        else None
+    )
+    return _planner_validation(intent, normalized, passed, failed, repair)
 
 
 def _validate_increase_generation(
@@ -175,6 +276,56 @@ def _validate_increase_generation(
     )
 
 
+def _validate_increase_generation_for_planner(
+    state: GridState, intent: ActionIntent
+) -> ActionIntentValidation:
+    passed: list[str] = []
+    failed: list[str] = []
+    repair: list[str] = []
+    generator = next(
+        (item for item in state.local_generators if item.id == intent.generator_id), None
+    )
+    target = _data_center(state, intent.target_dc) if intent.target_dc else None
+
+    if generator:
+        passed.append(f"generator_id exists in local_generators: {generator.id}")
+    else:
+        failed.append(f"generator_id exists in local_generators: {intent.generator_id}")
+        repair.append("Choose generator_id from available local_generators.")
+
+    if target:
+        passed.append(f"target_dc exists in data_centers: {target.id}")
+    else:
+        failed.append(f"target_dc exists in data_centers: {intent.target_dc}")
+        repair.append("Choose target_dc from available data_centers.")
+
+    if generator and intent.mw <= generator.available_headroom_mw:
+        passed.append(
+            f"mw <= generator.available_headroom_mw: {intent.mw:g} <= "
+            f"{generator.available_headroom_mw:g}"
+        )
+    elif generator:
+        failed.append(
+            f"mw <= generator.available_headroom_mw: {intent.mw:g} > "
+            f"{generator.available_headroom_mw:g}"
+        )
+        repair.append(f"Reduce mw to <= {generator.available_headroom_mw:g}.")
+
+    if generator and target and generator.zone == target.zone:
+        passed.append(f"generator.zone supports target_dc.zone: {generator.zone} == {target.zone}")
+    elif generator and target:
+        failed.append(f"generator.zone supports target_dc.zone: {generator.zone} != {target.zone}")
+        repair.append("Choose a generator in the target data center zone.")
+
+    _check_positive_mw(intent, passed, failed, repair)
+    normalized = (
+        _normalized_generation_intent(generator.id, target.id, intent.mw)
+        if not failed and generator and target
+        else None
+    )
+    return _planner_validation(intent, normalized, passed, failed, repair)
+
+
 def _validate_curtail_load(state: GridState, intent: ActionIntent, action_id: str) -> ActionValidation:
     if not intent.dc:
         return _invalid("curtail_flexible_load requires dc")
@@ -198,6 +349,29 @@ def _validate_curtail_load(state: GridState, intent: ActionIntent, action_id: st
     )
 
 
+def _validate_curtail_load_for_planner(state: GridState, intent: ActionIntent) -> ActionIntentValidation:
+    passed: list[str] = []
+    failed: list[str] = []
+    repair: list[str] = []
+    dc = _data_center(state, intent.dc) if intent.dc else None
+
+    if dc:
+        passed.append(f"dc exists in data_centers: {dc.id}")
+    else:
+        failed.append(f"dc exists in data_centers: {intent.dc}")
+        repair.append("Choose dc from available data_centers.")
+
+    if dc and intent.mw <= dc.flexible_mw:
+        passed.append(f"mw <= dc.flexible_mw: {intent.mw:g} <= {dc.flexible_mw:g}")
+    elif dc:
+        failed.append(f"mw <= dc.flexible_mw: {intent.mw:g} > {dc.flexible_mw:g}")
+        repair.append(f"Reduce mw to <= {dc.flexible_mw:g}.")
+
+    _check_positive_mw(intent, passed, failed, repair)
+    normalized = _normalized_curtail_intent(dc.id, intent.mw) if not failed and dc else None
+    return _planner_validation(intent, normalized, passed, failed, repair)
+
+
 def _data_center(state: GridState, data_center_id: str):
     return next((dc for dc in state.data_centers if dc.id == data_center_id), None)
 
@@ -213,3 +387,85 @@ def _valid(action: Action) -> ActionValidation:
 
 def _invalid(reason: str) -> ActionValidation:
     return ActionValidation(valid=False, reason=reason)
+
+
+def _planner_validation(
+    intent: ActionIntent,
+    normalized: ActionIntent | None,
+    passed: list[str],
+    failed: list[str],
+    repair: list[str],
+) -> ActionIntentValidation:
+    return ActionIntentValidation(
+        valid=not failed,
+        action_intent=intent,
+        normalized_action_intent=normalized,
+        passed_checks=passed,
+        failed_checks=failed,
+        repair_guidance=repair,
+    )
+
+
+def _check_positive_mw(
+    intent: ActionIntent,
+    passed: list[str],
+    failed: list[str],
+    repair: list[str],
+) -> None:
+    if intent.mw > 0:
+        passed.append(f"mw > 0: {intent.mw:g} > 0")
+    else:
+        failed.append(f"mw > 0: {intent.mw:g} <= 0")
+        repair.append("Use a positive mw value.")
+
+
+def _normalized_shift_intent(from_dc: str, to_dc: str, mw: float) -> ActionIntent:
+    return ActionIntent(
+        type="shift_data_center_load",
+        from_dc=from_dc,
+        to_dc=to_dc,
+        battery_id=None,
+        generator_id=None,
+        target_dc=None,
+        dc=None,
+        mw=mw,
+    )
+
+
+def _normalized_battery_intent(battery_id: str, target_dc: str, mw: float) -> ActionIntent:
+    return ActionIntent(
+        type="dispatch_battery",
+        from_dc=None,
+        to_dc=None,
+        battery_id=battery_id,
+        generator_id=None,
+        target_dc=target_dc,
+        dc=None,
+        mw=mw,
+    )
+
+
+def _normalized_generation_intent(generator_id: str, target_dc: str, mw: float) -> ActionIntent:
+    return ActionIntent(
+        type="increase_local_generation",
+        from_dc=None,
+        to_dc=None,
+        battery_id=None,
+        generator_id=generator_id,
+        target_dc=target_dc,
+        dc=None,
+        mw=mw,
+    )
+
+
+def _normalized_curtail_intent(dc: str, mw: float) -> ActionIntent:
+    return ActionIntent(
+        type="curtail_flexible_load",
+        from_dc=None,
+        to_dc=None,
+        battery_id=None,
+        generator_id=None,
+        target_dc=None,
+        dc=dc,
+        mw=mw,
+    )

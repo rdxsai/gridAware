@@ -23,6 +23,11 @@ def test_planner_report_schema_requires_ranked_action_intents() -> None:
                         "dc": None,
                         "mw": 10.0,
                     },
+                    "validation_passed": True,
+                    "validation_passed_checks": [
+                        "from_dc exists in data_centers: DC_A",
+                        "to_dc exists in data_centers: DC_B",
+                    ],
                     "target_violations": ["line_4", "DC_A"],
                     "feasibility_checks": [
                         "DC_A exists with 24 MW flexible load.",

@@ -60,6 +60,26 @@ def responses_tool_definitions() -> list[dict[str, Any]]:
         },
         {
             "type": "function",
+            "name": "validate_action_intent",
+            "description": (
+                "Run deterministic backend feasibility checks for a drafted mitigation action "
+                "intent. Use this before including any action_intent in the final planner report."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action_intent": {
+                        **_action_intent_schema(),
+                        "description": "Structured mitigation action intent to validate.",
+                    }
+                },
+                "required": ["action_intent"],
+                "additionalProperties": False,
+            },
+            "strict": True,
+        },
+        {
+            "type": "function",
             "name": "simulate_action",
             "description": (
                 "Validate and simulate a mitigation action without mutating the active grid. "

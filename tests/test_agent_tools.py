@@ -11,6 +11,7 @@ def test_responses_tool_definitions_are_strict() -> None:
         "get_grid_state",
         "propose_grid_actions",
         "get_available_controls",
+        "validate_action_intent",
         "simulate_action",
         "evaluate_action_result",
         "apply_action",
@@ -80,6 +81,50 @@ def test_tool_runtime_returns_available_controls() -> None:
         "mw <= to_dc.receiving_headroom_mw"
         in result["action_feasibility_policy"]["shift_data_center_load"]["valid_checks"]
     )
+
+
+def test_tool_runtime_validates_action_intent() -> None:
+    runtime = GridToolRuntime()
+
+    valid = json.loads(
+        runtime.execute(
+            "validate_action_intent",
+            {
+                "action_intent": {
+                    "type": "shift_data_center_load",
+                    "from_dc": "DC_A",
+                    "to_dc": "DC_B",
+                    "battery_id": None,
+                    "generator_id": None,
+                    "target_dc": None,
+                    "dc": None,
+                    "mw": 15.0,
+                }
+            },
+        )
+    )
+    invalid = json.loads(
+        runtime.execute(
+            "validate_action_intent",
+            {
+                "action_intent": {
+                    "type": "shift_data_center_load",
+                    "from_dc": "DC_A",
+                    "to_dc": "DC_B",
+                    "battery_id": None,
+                    "generator_id": None,
+                    "target_dc": None,
+                    "dc": None,
+                    "mw": 50.0,
+                }
+            },
+        )
+    )
+
+    assert valid["validation"]["valid"] is True
+    assert valid["validation"]["normalized_action_intent"]["to_dc"] == "DC_B"
+    assert invalid["validation"]["valid"] is False
+    assert invalid["validation"]["failed_checks"]
 
 
 def test_tool_runtime_rejects_infeasible_agent_intent() -> None:

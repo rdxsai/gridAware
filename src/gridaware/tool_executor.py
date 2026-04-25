@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from gridaware.actions import propose_grid_actions
+from gridaware.actions import propose_grid_actions, validate_action_intent_for_planner
 from gridaware.models import ActionIntent, Evaluation, GridState
 from gridaware.scenarios import load_demo_scenario
 from gridaware.simulator import evaluate_result, get_grid_state, simulate_action, simulate_action_intent
@@ -33,6 +33,8 @@ class GridToolRuntime:
                     payload = self.propose_grid_actions(args["target_violation_id"])
                 case "get_available_controls":
                     payload = self.get_available_controls()
+                case "validate_action_intent":
+                    payload = self.validate_action_intent(args["action_intent"])
                 case "simulate_action":
                     payload = self.simulate_action(args["action_id"], args["action_intent"])
                 case "evaluate_action_result":
@@ -99,6 +101,13 @@ class GridToolRuntime:
 
         self._simulations[result.action_id] = result
         return {"ok": True, "simulation": result.model_dump(mode="json")}
+
+    def validate_action_intent(self, action_intent: dict[str, Any]) -> dict[str, Any]:
+        validation = validate_action_intent_for_planner(
+            self.active_state,
+            ActionIntent.model_validate(action_intent),
+        )
+        return {"ok": True, "validation": validation.model_dump(mode="json")}
 
     def evaluate_action_result(self, action_id: str) -> dict[str, Any]:
         result = self._simulations.get(action_id)

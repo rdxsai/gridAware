@@ -93,6 +93,8 @@ class PlannerCandidate(BaseModel):
 
     rank: int
     action_intent: PlannerActionIntent
+    validation_passed: bool
+    validation_passed_checks: list[str]
     target_violations: list[str]
     feasibility_checks: list[str]
     expected_effect: str

@@ -18,7 +18,7 @@ from gridaware.tool_executor import GridToolRuntime
 
 
 def planner_tools() -> list[dict[str, Any]]:
-    allowed_names = {"get_grid_state", "get_available_controls"}
+    allowed_names = {"get_grid_state", "get_available_controls", "validate_action_intent"}
     return [tool for tool in responses_tool_definitions() if tool["name"] in allowed_names]
 
 
@@ -43,7 +43,7 @@ def run_planner_agent(
             "Ranked mitigation action intents for later simulation.",
         ),
         initial_tool_choice={"type": "function", "name": "get_grid_state"},
-        max_tool_rounds=5,
+        max_tool_rounds=10,
     )
     report = PlannerReport.model_validate_json(result.output_text)
     return PlannerRunResult(report=_normalize_planner_report(report), trace=result.trace)
