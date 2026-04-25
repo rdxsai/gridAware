@@ -44,6 +44,7 @@ def run_analyzer_agent(
             pydantic_strict_json_schema(AnalyzerReport),
             "Diagnostic grid analysis report for the planner.",
         ),
+        initial_tool_choice={"type": "function", "name": "get_grid_state"},
     )
     return AnalyzerRunResult(
         report=AnalyzerReport.model_validate_json(result.output_text),

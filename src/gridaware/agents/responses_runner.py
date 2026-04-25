@@ -42,7 +42,9 @@ def run_responses_agent(
     runtime: GridToolRuntime,
     text_format: dict[str, Any],
     max_tool_rounds: int = 4,
+    initial_tool_choice: dict[str, Any] | None = None,
 ) -> ResponsesRunResult:
+    allowed_tool_names = {tool["name"] for tool in tools}
     response = client.responses.create(
         model=model,
         input=[
@@ -52,6 +54,7 @@ def run_responses_agent(
         tools=tools,
         text={"format": text_format},
         parallel_tool_calls=False,
+        tool_choice=initial_tool_choice,
     )
     trace = AgentRunTrace(response_ids=[response.id])
 
@@ -62,6 +65,8 @@ def run_responses_agent(
 
         tool_outputs = []
         for call in function_calls:
+            if call.name not in allowed_tool_names:
+                raise RuntimeError(f"Agent requested disallowed tool: {call.name}")
             output = runtime.execute(call.name, call.arguments)
             trace.tool_calls.append(
                 AgentToolCallTrace(name=call.name, arguments=call.arguments, output=output)

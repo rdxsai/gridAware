@@ -82,3 +82,42 @@ def test_responses_runner_executes_tool_calls_and_returns_trace() -> None:
     assert report.risk_level == "high"
     assert result.trace.response_ids == ["resp_1", "resp_2"]
     assert result.trace.tool_calls[0].name == "get_grid_state"
+
+
+def test_responses_runner_rejects_disallowed_tool_calls() -> None:
+    class BadResponses(FakeResponses):
+        def create(self, **kwargs):
+            return SimpleNamespace(
+                id="resp_bad",
+                output_text="",
+                output=[
+                    SimpleNamespace(
+                        type="function_call",
+                        name="apply_action",
+                        arguments='{"action_id":"A1"}',
+                        call_id="call_bad",
+                    )
+                ],
+            )
+
+    class BadClient:
+        responses = BadResponses()
+
+    try:
+        run_responses_agent(
+            client=BadClient(),
+            model="test-model",
+            system_prompt="Return JSON.",
+            user_prompt="Analyze.",
+            tools=[tool for tool in responses_tool_definitions() if tool["name"] == "get_grid_state"],
+            runtime=GridToolRuntime(load_agent_grid()),
+            text_format=json_schema_text_format(
+                "analyzer_report",
+                pydantic_strict_json_schema(AnalyzerReport),
+                "Analyzer report.",
+            ),
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "Agent requested disallowed tool: apply_action"
+    else:
+        raise AssertionError("Expected disallowed tool call to be rejected")

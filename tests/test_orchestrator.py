@@ -69,4 +69,5 @@ def test_orchestrator_runs_analyzer_with_only_grid_state_tool() -> None:
     assert result.report.risk_level == "high"
     assert [tool["name"] for tool in first_call["tools"]] == ["get_grid_state"]
     assert first_call["parallel_tool_calls"] is False
+    assert first_call["tool_choice"] == {"type": "function", "name": "get_grid_state"}
     assert result.trace.tool_calls[0].name == "get_grid_state"
