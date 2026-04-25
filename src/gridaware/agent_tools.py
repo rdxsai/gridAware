@@ -129,6 +129,33 @@ def responses_tool_definitions() -> list[dict[str, Any]]:
         },
         {
             "type": "function",
+            "name": "simulate_action_sequence",
+            "description": (
+                "Run a pandapower-backed cumulative simulation for an ordered sequence of "
+                "validated action_intents. A single-action candidate should be represented as "
+                "a sequence with one action_intent. Each step starts from the previous step's "
+                "simulated state and consumes remaining control availability."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action_intents": {
+                        "type": "array",
+                        "items": _action_intent_schema(),
+                        "minItems": 1,
+                        "description": (
+                            "Ordered mitigation actions to simulate cumulatively from the "
+                            "baseline scenario state."
+                        ),
+                    }
+                },
+                "required": ["action_intents"],
+                "additionalProperties": False,
+            },
+            "strict": True,
+        },
+        {
+            "type": "function",
             "name": "evaluate_action_result",
             "description": (
                 "Evaluate a previously simulated action against deterministic grid safety criteria."

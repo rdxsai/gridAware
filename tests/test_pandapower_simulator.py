@@ -1,5 +1,8 @@
 from gridaware.models import ActionIntent
-from gridaware.pandapower_simulator import simulate_action_intent_on_pandapower
+from gridaware.pandapower_simulator import (
+    simulate_action_intent_on_pandapower,
+    simulate_action_sequence_on_pandapower,
+)
 from gridaware.scenarios import load_agent_scenario
 
 
@@ -68,3 +71,66 @@ def test_pandapower_simulator_hard_spike_single_action_is_partial() -> None:
         ("line_overload", "line_25"),
         ("voltage_low", "DC_A"),
     }
+
+
+def test_pandapower_simulator_sequence_resolves_hard_spike_cumulatively() -> None:
+    bundle = load_agent_scenario("case33bw_data_center_spike_hard")
+    result = simulate_action_sequence_on_pandapower(
+        bundle,
+        [
+            ActionIntent(
+                type="dispatch_battery",
+                battery_id="BAT_A",
+                target_dc="DC_A",
+                mw=0.25,
+            ),
+            ActionIntent(
+                type="curtail_flexible_load",
+                dc="DC_A",
+                mw=0.25,
+            ),
+            ActionIntent(
+                type="increase_local_generation",
+                generator_id="GEN_A",
+                target_dc="DC_A",
+                mw=0.25,
+            ),
+        ],
+    )
+
+    assert result["sequence_completed"] is True
+    assert result["failed_step_index"] is None
+    assert len(result["step_results"]) == 3
+    assert result["final_diff"]["resolved_violations"] == [
+        {"type": "line_overload", "element_id": "line_25"},
+        {"type": "voltage_low", "element_id": "DC_A"},
+    ]
+    assert result["final_diff"]["remaining_violations"] == []
+    assert result["final_state"]["grid_health_score"] > bundle.grid_state.grid_health_score
+
+
+def test_pandapower_simulator_sequence_stops_when_control_is_depleted() -> None:
+    bundle = load_agent_scenario("case33bw_data_center_spike_hard")
+    result = simulate_action_sequence_on_pandapower(
+        bundle,
+        [
+            ActionIntent(
+                type="dispatch_battery",
+                battery_id="BAT_A",
+                target_dc="DC_A",
+                mw=0.25,
+            ),
+            ActionIntent(
+                type="dispatch_battery",
+                battery_id="BAT_A",
+                target_dc="DC_A",
+                mw=0.25,
+            ),
+        ],
+    )
+
+    assert result["sequence_completed"] is False
+    assert result["failed_step_index"] == 2
+    assert result["step_results"][0]["validation_passed"] is True
+    assert result["step_results"][1]["validation_passed"] is False
+    assert "has only 0.0 MW available" in result["step_results"][1]["validation_errors"][0]

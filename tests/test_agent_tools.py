@@ -15,6 +15,7 @@ def test_responses_tool_definitions_are_strict() -> None:
         "validate_action_intent",
         "simulate_action",
         "simulate_action_intent",
+        "simulate_action_sequence",
         "evaluate_action_result",
         "apply_action",
         "compare_grid_states",
@@ -202,6 +203,59 @@ def test_tool_runtime_simulates_action_intent_with_pandapower_bundle() -> None:
     assert result["power_flow_converged"] is True
     assert result["after_state"]["scenario_id"] == "mv_data_center_spike"
     assert result["diff"]["voltage_changes"]
+
+
+def test_tool_runtime_simulates_action_sequence_with_pandapower_bundle() -> None:
+    runtime = GridToolRuntime(
+        scenario_bundle=load_agent_scenario("case33bw_data_center_spike_hard")
+    )
+
+    result = json.loads(
+        runtime.execute(
+            "simulate_action_sequence",
+            {
+                "action_intents": [
+                    {
+                        "type": "dispatch_battery",
+                        "from_dc": None,
+                        "to_dc": None,
+                        "battery_id": "BAT_A",
+                        "generator_id": None,
+                        "target_dc": "DC_A",
+                        "dc": None,
+                        "mw": 0.25,
+                    },
+                    {
+                        "type": "curtail_flexible_load",
+                        "from_dc": None,
+                        "to_dc": None,
+                        "battery_id": None,
+                        "generator_id": None,
+                        "target_dc": None,
+                        "dc": "DC_A",
+                        "mw": 0.25,
+                    },
+                    {
+                        "type": "increase_local_generation",
+                        "from_dc": None,
+                        "to_dc": None,
+                        "battery_id": None,
+                        "generator_id": "GEN_A",
+                        "target_dc": "DC_A",
+                        "dc": None,
+                        "mw": 0.25,
+                    },
+                ]
+            },
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["sequence_completed"] is True
+    assert len(result["step_results"]) == 3
+    assert result["final_state"]["scenario_id"] == "case33bw_data_center_spike_hard"
+    assert result["final_diff"]["score_change"]["delta"] > 0
+    assert result["final_diff"]["remaining_violations"] == []
 
 
 def test_tool_runtime_rejects_infeasible_agent_intent() -> None:
