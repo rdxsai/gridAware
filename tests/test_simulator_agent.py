@@ -236,3 +236,67 @@ def test_simulator_translates_conceptual_generation_to_backend_action() -> None:
             ],
         }
     ]
+
+
+def test_simulator_translates_storage_discharge_to_battery_dispatch() -> None:
+    planner_report = PlannerReport.model_validate(
+        {
+            "scenario_id": "case33bw_data_center_spike_hard",
+            "planning_summary": "Use battery support near DC_A.",
+            "primary_objectives": ["Reduce line_25 loading."],
+            "candidates": [
+                {
+                    "rank": 1,
+                    "action_sequence": [
+                        {
+                            "type": "adjust_storage_discharge",
+                            "intent_summary": "Discharge battery near DC_A.",
+                            "from_dc": None,
+                            "to_dc": "DC_A",
+                            "battery_id": "BAT_A",
+                            "generator_id": None,
+                            "target_dc": "DC_A",
+                            "dc": "DC_A",
+                            "resource_id": "BAT_A",
+                            "target_bus": None,
+                            "q_mvar": None,
+                            "target_element": None,
+                            "control_asset": "BAT_A",
+                            "setpoint": 0.25,
+                            "units": "MW",
+                            "mw": 0.25,
+                        }
+                    ],
+                    "validation_passed": False,
+                    "validation_passed_checks": [],
+                    "target_violations": ["line_25"],
+                    "feasibility_checks": ["BAT_A has 0.25 MW available."],
+                    "expected_effect": "Reduce upstream imports.",
+                    "rationale": "Battery near the tail should relieve the constrained corridor.",
+                    "risk_notes": [],
+                    "planner_confidence": "medium",
+                }
+            ],
+            "rejected_options": [],
+            "requires_simulation": True,
+        }
+    )
+
+    candidates, unsupported = _simulation_candidates(planner_report)
+
+    assert unsupported == []
+    assert candidates[0]["action_intents"] == [
+        {
+            "type": "dispatch_battery",
+            "from_dc": None,
+            "to_dc": None,
+            "battery_id": "BAT_A",
+            "generator_id": None,
+            "target_dc": "DC_A",
+            "dc": None,
+            "resource_id": None,
+            "target_bus": None,
+            "q_mvar": None,
+            "mw": 0.25,
+        }
+    ]
