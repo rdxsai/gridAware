@@ -1,0 +1,44 @@
+from gridaware.agents.models import PlannerReport
+
+
+def test_planner_report_schema_requires_ranked_action_intents() -> None:
+    report = PlannerReport.model_validate(
+        {
+            "scenario_id": "mv_data_center_spike",
+            "planning_summary": "Prioritize reducing DC_A stress and line_4 loading.",
+            "primary_objectives": [
+                "Reduce line_4 loading below 100 percent.",
+                "Restore DC_A voltage to at least 0.95 pu.",
+            ],
+            "candidates": [
+                {
+                    "rank": 1,
+                    "action_intent": {
+                        "type": "shift_data_center_load",
+                        "from_dc": "DC_A",
+                        "to_dc": "DC_B",
+                        "battery_id": None,
+                        "generator_id": None,
+                        "target_dc": None,
+                        "dc": None,
+                        "mw": 10.0,
+                    },
+                    "target_violations": ["line_4", "DC_A"],
+                    "feasibility_checks": [
+                        "DC_A exists with 24 MW flexible load.",
+                        "DC_B has 23 MW receiving headroom.",
+                    ],
+                    "expected_effect": "Reduce demand at DC_A and relieve the stressed corridor.",
+                    "rationale": "A partial shift addresses both active violations without maxing transfer.",
+                    "risk_notes": ["Simulation must verify watchlist lines remain below limits."],
+                    "planner_confidence": "high",
+                }
+            ],
+            "rejected_options": ["Do not apply any action without simulation."],
+            "requires_simulation": True,
+        }
+    )
+
+    assert report.requires_simulation is True
+    assert report.candidates[0].action_intent.from_dc == "DC_A"
+    assert report.candidates[0].planner_confidence == "high"
