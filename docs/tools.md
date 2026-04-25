@@ -167,7 +167,15 @@ variant, runs power flow, and converts the result into `GridState`.
 
 Initial variants:
 
+- `baseline_case33bw`: untouched `pandapower.networks.case33bw()` benchmark for comparison.
+- `case33bw_data_center_spike`: `case33bw` benchmark with documented downstream
+  data-center load, local flexibility resources, and a constrained feeder corridor.
 - `mv_data_center_spike`: CIGRE MV benchmark with data center load and a constrained corridor.
 - `mv_renewable_drop`: CIGRE MV benchmark with reduced DER output.
 - `mv_line_constraint`: CIGRE MV benchmark with a tighter line constraint.
 - `lv_edge_data_center`: CIGRE LV benchmark with edge data center stress.
+
+Scenario bundles carry metadata with the base network, scenario type, purpose, documented
+modifications, and limitations. The `case33bw_data_center_spike` scenario is a benchmark-based
+synthetic stress test: outputs are computed by pandapower, and the modifications are disclosed
+rather than presented as an untouched utility grid.

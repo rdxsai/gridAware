@@ -85,6 +85,54 @@ def test_tool_runtime_returns_available_controls() -> None:
     )
 
 
+def test_tool_runtime_returns_case33bw_scenario_specific_controls() -> None:
+    runtime = GridToolRuntime(scenario_bundle=load_agent_scenario("case33bw_data_center_spike"))
+
+    result = json.loads(runtime.execute("get_available_controls", {}))
+
+    assert result["ok"] is True
+    assert result["allowed_action_types"] == [
+        "shift_data_center_load",
+        "dispatch_battery",
+        "increase_local_generation",
+        "curtail_flexible_load",
+    ]
+    assert result["data_centers"] == [
+        {
+            "id": "DC_A",
+            "zone": "feeder_tail",
+            "load_mw": 0.5,
+            "flexible_mw": 0.5,
+            "max_load_mw": 0.7,
+            "receiving_headroom_mw": 0.2,
+        },
+        {
+            "id": "DC_B",
+            "zone": "mid_feeder",
+            "load_mw": 0.25,
+            "flexible_mw": 0.1,
+            "max_load_mw": 0.8,
+            "receiving_headroom_mw": 0.55,
+        },
+    ]
+    assert result["batteries"] == [{"id": "BAT_A", "zone": "feeder_tail", "available_mw": 0.5}]
+    assert result["local_generators"] == [
+        {"id": "GEN_A", "zone": "feeder_tail", "available_headroom_mw": 0.5}
+    ]
+
+
+def test_tool_runtime_returns_no_controls_for_untouched_case33bw_baseline() -> None:
+    runtime = GridToolRuntime(scenario_bundle=load_agent_scenario("baseline_case33bw"))
+
+    result = json.loads(runtime.execute("get_available_controls", {}))
+
+    assert result["ok"] is True
+    assert result["allowed_action_types"] == []
+    assert result["data_centers"] == []
+    assert result["batteries"] == []
+    assert result["local_generators"] == []
+
+
 def test_tool_runtime_validates_action_intent() -> None:
     runtime = GridToolRuntime()
 

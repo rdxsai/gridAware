@@ -20,7 +20,14 @@ def simulate_action_intent_on_pandapower(
     try:
         _apply_intent_to_net(net, data_centers, intent)
         pp.runpp(net, numba=False, max_iteration=30)
-        after_state = _grid_state_from_pandapower(net, bundle.scenario_id, data_centers)
+        after_state = _grid_state_from_pandapower(
+            net,
+            bundle.scenario_id,
+            data_centers,
+            bundle.batteries,
+            bundle.local_generators,
+            bundle.metadata,
+        )
     except (LoadflowNotConverged, ValueError) as exc:
         return {
             "ok": True,
@@ -122,7 +129,9 @@ def _grid_diff(before: GridState, after: GridState) -> dict[str, Any]:
             {"type": violation_type, "element_id": element_id}
             for violation_type, element_id in sorted(after_violations - before_violations)
         ],
-        "remaining_violations": [violation.model_dump(mode="json") for violation in after.violations],
+        "remaining_violations": [
+            violation.model_dump(mode="json") for violation in after.violations
+        ],
         "line_loading_changes": [
             {
                 "line": line.line,

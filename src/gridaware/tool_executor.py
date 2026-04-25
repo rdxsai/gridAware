@@ -10,7 +10,12 @@ from gridaware.actions import propose_grid_actions, validate_action_intent_for_p
 from gridaware.models import ActionIntent, Evaluation, GridState
 from gridaware.pandapower_simulator import simulate_action_intent_on_pandapower
 from gridaware.scenarios import ScenarioBundle, load_demo_scenario
-from gridaware.simulator import evaluate_result, get_grid_state, simulate_action, simulate_action_intent
+from gridaware.simulator import (
+    evaluate_result,
+    get_grid_state,
+    simulate_action,
+    simulate_action_intent,
+)
 
 
 class GridToolRuntime:
@@ -71,14 +76,19 @@ class GridToolRuntime:
         return {"ok": True, "actions": [action.model_dump(mode="json") for action in actions]}
 
     def get_available_controls(self) -> dict[str, Any]:
-        return {
-            "ok": True,
-            "allowed_action_types": [
+        allowed_action_types = (
+            self.scenario_bundle.allowed_action_types
+            if self.scenario_bundle is not None
+            else [
                 "shift_data_center_load",
                 "dispatch_battery",
                 "increase_local_generation",
                 "curtail_flexible_load",
-            ],
+            ]
+        )
+        return {
+            "ok": True,
+            "allowed_action_types": allowed_action_types,
             "data_centers": [
                 {
                     "id": dc.id,
@@ -90,7 +100,9 @@ class GridToolRuntime:
                 }
                 for dc in self.active_state.data_centers
             ],
-            "batteries": [battery.model_dump(mode="json") for battery in self.active_state.batteries],
+            "batteries": [
+                battery.model_dump(mode="json") for battery in self.active_state.batteries
+            ],
             "local_generators": [
                 generator.model_dump(mode="json")
                 for generator in self.active_state.local_generators

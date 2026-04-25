@@ -52,8 +52,18 @@ class LocalGenerator(BaseModel):
     available_headroom_mw: float
 
 
+class ScenarioMetadata(BaseModel):
+    scenario_id: str
+    base_network: str
+    scenario_type: str
+    purpose: str
+    modifications: list[str]
+    limitations: list[str] = Field(default_factory=list)
+
+
 class GridState(BaseModel):
     scenario_id: str
+    metadata: ScenarioMetadata | None = None
     bus_voltages: list[BusVoltage]
     line_loadings: list[LineLoading]
     data_centers: list[DataCenterLoad]
