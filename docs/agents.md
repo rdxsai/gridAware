@@ -38,12 +38,13 @@ GridOrchestrator.run_analyzer(...)
 
 ## Planner Agent
 
-Purpose: create ranked mitigation action intents for later simulation.
+Purpose: create ranked mitigation action sequences for later simulation.
 
 Allowed tools:
 
 - `get_grid_state`
 - `get_available_controls`
+- `validate_action_intent`
 
 Forbidden tools:
 
@@ -56,7 +57,7 @@ Forbidden tools:
 Output:
 
 - `PlannerReport` from `src/gridaware/agents/models.py`
-- Each candidate includes a structured `action_intent`.
+- Each candidate includes a structured `action_sequence`; one-step sequences are valid.
 - Each candidate includes explicit `feasibility_checks` using numbers from grid/control state.
 - `requires_simulation` must be `true`.
 
@@ -68,17 +69,17 @@ GridOrchestrator.run_planner(...)
   -> GridToolRuntime(...)
   -> run_analyzer_agent(...)
   -> run_planner_agent(...)
-  -> planner calls get_grid_state and get_available_controls
+  -> planner calls get_grid_state, get_available_controls, and validate_action_intent
   -> validate PlannerReport
 ```
 
 ## Simulator Agent
 
-Purpose: simulate validated planner action intents and explain before/after grid changes.
+Purpose: simulate validated planner action sequences and explain before/after grid changes.
 
 Allowed tools:
 
-- `simulate_action_intent`
+- `simulate_action_sequence`
 
 Forbidden behavior:
 
@@ -89,8 +90,8 @@ Forbidden behavior:
 Output:
 
 - `SimulatorReport` from `src/gridaware/agents/models.py`
-- Each candidate result describes successful changes, failed changes, remaining violations, and final
-  grid status.
+- Each candidate result describes sequence completion, failed step if any, successful changes,
+  failed changes, remaining violations, and final grid status.
 - `final_grid_state` is the simulated `after_state` for the best candidate, not an applied active
   grid state.
 
@@ -103,7 +104,7 @@ GridOrchestrator.run_simulator(...)
   -> run_analyzer_agent(...)
   -> run_planner_agent(...)
   -> run_simulator_agent(...)
-  -> simulator calls simulate_action_intent for planner candidates
+  -> simulator calls simulate_action_sequence for planner candidates
   -> validate SimulatorReport
 ```
 

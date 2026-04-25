@@ -18,7 +18,9 @@ from gridaware.tool_executor import GridToolRuntime
 
 
 def simulator_tools() -> list[dict[str, Any]]:
-    return [tool for tool in responses_tool_definitions() if tool["name"] == "simulate_action_intent"]
+    return [
+        tool for tool in responses_tool_definitions() if tool["name"] == "simulate_action_sequence"
+    ]
 
 
 def run_simulator_agent(
@@ -52,7 +54,7 @@ def run_simulator_agent(
 
 def _simulator_user_prompt(planner_report: PlannerReport) -> str:
     return (
-        "Simulate each validated action candidate in this PlannerReport. "
-        "Call simulate_action_intent once per candidate before returning final JSON.\n\n"
+        "Simulate each validated action sequence candidate in this PlannerReport. "
+        "Call simulate_action_sequence once per candidate before returning final JSON.\n\n"
         f"{json.dumps(planner_report.model_dump(mode='json'), indent=2)}"
     )

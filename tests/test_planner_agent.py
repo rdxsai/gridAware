@@ -104,16 +104,18 @@ def test_planner_agent_uses_grid_state_and_available_controls() -> None:
                     "candidates": [
                         {
                             "rank": 1,
-                            "action_intent": {
-                                "type": "increase_local_generation",
-                                "from_dc": "DC_A",
-                                "to_dc": "DC_A",
-                                "battery_id": "BAT_A",
-                                "generator_id": "GEN_A",
-                                "target_dc": "DC_A",
-                                "dc": "DC_A",
-                                "mw": 10.0,
-                            },
+                            "action_sequence": [
+                                {
+                                    "type": "increase_local_generation",
+                                    "from_dc": "DC_A",
+                                    "to_dc": "DC_A",
+                                    "battery_id": "BAT_A",
+                                    "generator_id": "GEN_A",
+                                    "target_dc": "DC_A",
+                                    "dc": "DC_A",
+                                    "mw": 10.0,
+                                }
+                            ],
                             "validation_passed": True,
                             "validation_passed_checks": [
                                 "generator_id exists in local_generators: GEN_A",
@@ -156,9 +158,10 @@ def test_planner_agent_uses_grid_state_and_available_controls() -> None:
     assert planner_result.trace.tool_calls[0].name == "get_grid_state"
     assert planner_result.trace.tool_calls[1].name == "get_available_controls"
     assert planner_result.trace.tool_calls[2].name == "validate_action_intent"
-    assert planner_result.report.candidates[0].action_intent.mw == 10.0
-    assert planner_result.report.candidates[0].action_intent.type == "increase_local_generation"
-    assert planner_result.report.candidates[0].action_intent.to_dc is None
-    assert planner_result.report.candidates[0].action_intent.battery_id is None
-    assert planner_result.report.candidates[0].action_intent.dc is None
+    intent = planner_result.report.candidates[0].action_sequence[0]
+    assert intent.mw == 10.0
+    assert intent.type == "increase_local_generation"
+    assert intent.to_dc is None
+    assert intent.battery_id is None
+    assert intent.dc is None
     assert planner_result.report.requires_simulation is True

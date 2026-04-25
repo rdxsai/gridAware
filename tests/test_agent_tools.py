@@ -14,7 +14,6 @@ def test_responses_tool_definitions_are_strict() -> None:
         "get_available_controls",
         "validate_action_intent",
         "simulate_action",
-        "simulate_action_intent",
         "simulate_action_sequence",
         "evaluate_action_result",
         "apply_action",

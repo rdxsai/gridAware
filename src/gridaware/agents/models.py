@@ -92,7 +92,7 @@ class PlannerCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     rank: int
-    action_intent: PlannerActionIntent
+    action_sequence: list[PlannerActionIntent]
     validation_passed: bool
     validation_passed_checks: list[str]
     target_violations: list[str]
@@ -125,7 +125,9 @@ class SimulatedActionResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     candidate_rank: int
-    action_intent: PlannerActionIntent
+    action_sequence: list[PlannerActionIntent]
+    sequence_completed: bool
+    failed_step_index: int | None
     power_flow_converged: bool
     successful_changes: list[str]
     failed_changes: list[str]

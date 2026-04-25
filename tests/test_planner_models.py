@@ -1,7 +1,7 @@
 from gridaware.agents.models import PlannerReport
 
 
-def test_planner_report_schema_requires_ranked_action_intents() -> None:
+def test_planner_report_schema_requires_ranked_action_sequences() -> None:
     report = PlannerReport.model_validate(
         {
             "scenario_id": "mv_data_center_spike",
@@ -13,16 +13,18 @@ def test_planner_report_schema_requires_ranked_action_intents() -> None:
             "candidates": [
                 {
                     "rank": 1,
-                    "action_intent": {
-                        "type": "shift_data_center_load",
-                        "from_dc": "DC_A",
-                        "to_dc": "DC_B",
-                        "battery_id": None,
-                        "generator_id": None,
-                        "target_dc": None,
-                        "dc": None,
-                        "mw": 10.0,
-                    },
+                    "action_sequence": [
+                        {
+                            "type": "shift_data_center_load",
+                            "from_dc": "DC_A",
+                            "to_dc": "DC_B",
+                            "battery_id": None,
+                            "generator_id": None,
+                            "target_dc": None,
+                            "dc": None,
+                            "mw": 10.0,
+                        }
+                    ],
                     "validation_passed": True,
                     "validation_passed_checks": [
                         "from_dc exists in data_centers: DC_A",
@@ -45,5 +47,5 @@ def test_planner_report_schema_requires_ranked_action_intents() -> None:
     )
 
     assert report.requires_simulation is True
-    assert report.candidates[0].action_intent.from_dc == "DC_A"
+    assert report.candidates[0].action_sequence[0].from_dc == "DC_A"
     assert report.candidates[0].planner_confidence == "high"

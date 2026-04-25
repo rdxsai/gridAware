@@ -20,19 +20,21 @@ class FakeResponses:
                 output=[
                     SimpleNamespace(
                         type="function_call",
-                        name="simulate_action_intent",
+                        name="simulate_action_sequence",
                         arguments=json.dumps(
                             {
-                                "action_intent": {
-                                    "type": "curtail_flexible_load",
-                                    "from_dc": None,
-                                    "to_dc": None,
-                                    "battery_id": None,
-                                    "generator_id": None,
-                                    "target_dc": None,
-                                    "dc": "DC_A",
-                                    "mw": 8.0,
-                                }
+                                "action_intents": [
+                                    {
+                                        "type": "curtail_flexible_load",
+                                        "from_dc": None,
+                                        "to_dc": None,
+                                        "battery_id": None,
+                                        "generator_id": None,
+                                        "target_dc": None,
+                                        "dc": "DC_A",
+                                        "mw": 8.0,
+                                    }
+                                ]
                             }
                         ),
                         call_id="sim_call_1",
@@ -48,16 +50,20 @@ class FakeResponses:
                     "action_results": [
                         {
                             "candidate_rank": 1,
-                            "action_intent": {
-                                "type": "curtail_flexible_load",
-                                "from_dc": None,
-                                "to_dc": None,
-                                "battery_id": None,
-                                "generator_id": None,
-                                "target_dc": None,
-                                "dc": "DC_A",
-                                "mw": 8.0,
-                            },
+                            "action_sequence": [
+                                {
+                                    "type": "curtail_flexible_load",
+                                    "from_dc": None,
+                                    "to_dc": None,
+                                    "battery_id": None,
+                                    "generator_id": None,
+                                    "target_dc": None,
+                                    "dc": "DC_A",
+                                    "mw": 8.0,
+                                }
+                            ],
+                            "sequence_completed": True,
+                            "failed_step_index": None,
                             "power_flow_converged": True,
                             "successful_changes": ["DC_A voltage improved."],
                             "failed_changes": ["line_4 violation remains."],
@@ -86,7 +92,7 @@ class FakeClient:
         self.responses = FakeResponses()
 
 
-def test_simulator_agent_uses_single_action_intent_tool() -> None:
+def test_simulator_agent_uses_action_sequence_tool() -> None:
     planner_report = PlannerReport.model_validate(
         {
             "scenario_id": "mv_data_center_spike",
@@ -95,16 +101,18 @@ def test_simulator_agent_uses_single_action_intent_tool() -> None:
             "candidates": [
                 {
                     "rank": 1,
-                    "action_intent": {
-                        "type": "curtail_flexible_load",
-                        "from_dc": None,
-                        "to_dc": None,
-                        "battery_id": None,
-                        "generator_id": None,
-                        "target_dc": None,
-                        "dc": "DC_A",
-                        "mw": 8.0,
-                    },
+                    "action_sequence": [
+                        {
+                            "type": "curtail_flexible_load",
+                            "from_dc": None,
+                            "to_dc": None,
+                            "battery_id": None,
+                            "generator_id": None,
+                            "target_dc": None,
+                            "dc": "DC_A",
+                            "mw": 8.0,
+                        }
+                    ],
                     "validation_passed": True,
                     "validation_passed_checks": ["dc exists in data_centers: DC_A"],
                     "target_violations": ["DC_A"],
@@ -126,6 +134,6 @@ def test_simulator_agent_uses_single_action_intent_tool() -> None:
         model="test-model",
     )
 
-    assert [tool["name"] for tool in simulator_tools()] == ["simulate_action_intent"]
-    assert result.trace.tool_calls[0].name == "simulate_action_intent"
+    assert [tool["name"] for tool in simulator_tools()] == ["simulate_action_sequence"]
+    assert result.trace.tool_calls[0].name == "simulate_action_sequence"
     assert result.report.best_candidate_rank == 1

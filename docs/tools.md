@@ -92,28 +92,42 @@ Returns deterministic feasibility results: `valid`, `passed_checks`, `failed_che
 `repair_guidance`, and a normalized intent when valid. The planner should call this before including
 an action intent in its final report.
 
-### `simulate_action_intent`
+### `simulate_action_sequence`
 
 Parameters:
 
 ```json
 {
-  "action_intent": {
-    "type": "curtail_flexible_load",
-    "from_dc": null,
-    "to_dc": null,
-    "battery_id": null,
-    "generator_id": null,
-    "target_dc": null,
-    "dc": "DC_A",
-    "mw": 8
-  }
+  "action_intents": [
+    {
+      "type": "dispatch_battery",
+      "from_dc": null,
+      "to_dc": null,
+      "battery_id": "BAT_A",
+      "generator_id": null,
+      "target_dc": "DC_A",
+      "dc": null,
+      "mw": 0.25
+    },
+    {
+      "type": "curtail_flexible_load",
+      "from_dc": null,
+      "to_dc": null,
+      "battery_id": null,
+      "generator_id": null,
+      "target_dc": null,
+      "dc": "DC_A",
+      "mw": 0.25
+    }
+  ]
 }
 ```
 
-Runs a pandapower-backed simulation on a copy of the baseline scenario network. Returns whether power
-flow converged, the baseline state, the after state, and before/after diffs. It does not apply the
-action to the active grid.
+Runs a pandapower-backed cumulative simulation on one copy of the baseline scenario network. A
+single action is represented as a one-item sequence. Each step starts from the previous step's
+simulated state, consumes remaining control availability, reruns power flow, and records a step diff.
+The tool returns step results, the final state, and the final before/after diff. It does not apply
+the sequence to the active grid.
 
 ### `evaluate_action_result`
 
@@ -155,9 +169,9 @@ Returns original vs active grid summary: health score, violation counts, and app
 
 ## Agent Boundary
 
-The model can choose from backend candidates or author structured action intents. It cannot mutate
-state directly. The backend enforces asset existence, available MW, destination capacity, simulation
-success, and evaluation acceptance before applying any action.
+The model can choose from backend candidates or author structured action sequences. It cannot mutate
+state directly. The backend enforces asset existence, available MW, destination capacity, cumulative
+control depletion, simulation success, and evaluation acceptance before applying any action.
 
 ## Scenario Source
 

@@ -40,7 +40,7 @@ def run_planner_agent(
         text_format=json_schema_text_format(
             "planner_report",
             pydantic_strict_json_schema(PlannerReport),
-            "Ranked mitigation action intents for later simulation.",
+            "Ranked mitigation action sequences for later simulation.",
         ),
         initial_tool_choice={"type": "function", "name": "get_grid_state"},
         max_tool_rounds=10,
@@ -60,44 +60,50 @@ def _planner_user_prompt(analyzer_report: AnalyzerReport) -> str:
 def _normalize_planner_report(report: PlannerReport) -> PlannerReport:
     candidates = []
     for candidate in report.candidates:
-        intent = candidate.action_intent
-        match intent.type:
-            case "shift_data_center_load":
-                intent = intent.model_copy(
-                    update={
-                        "battery_id": None,
-                        "generator_id": None,
-                        "target_dc": None,
-                        "dc": None,
-                    }
-                )
-            case "dispatch_battery":
-                intent = intent.model_copy(
-                    update={
-                        "from_dc": None,
-                        "to_dc": None,
-                        "generator_id": None,
-                        "dc": None,
-                    }
-                )
-            case "increase_local_generation":
-                intent = intent.model_copy(
-                    update={
-                        "from_dc": None,
-                        "to_dc": None,
-                        "battery_id": None,
-                        "dc": None,
-                    }
-                )
-            case "curtail_flexible_load":
-                intent = intent.model_copy(
-                    update={
-                        "from_dc": None,
-                        "to_dc": None,
-                        "battery_id": None,
-                        "generator_id": None,
-                        "target_dc": None,
-                    }
-                )
-        candidates.append(candidate.model_copy(update={"action_intent": intent}))
+        normalized_sequence = []
+        for intent in candidate.action_sequence:
+            normalized_sequence.append(_normalize_action_intent(intent))
+        candidates.append(candidate.model_copy(update={"action_sequence": normalized_sequence}))
     return report.model_copy(update={"candidates": candidates})
+
+
+def _normalize_action_intent(intent):
+    match intent.type:
+        case "shift_data_center_load":
+            return intent.model_copy(
+                update={
+                    "battery_id": None,
+                    "generator_id": None,
+                    "target_dc": None,
+                    "dc": None,
+                }
+            )
+        case "dispatch_battery":
+            return intent.model_copy(
+                update={
+                    "from_dc": None,
+                    "to_dc": None,
+                    "generator_id": None,
+                    "dc": None,
+                }
+            )
+        case "increase_local_generation":
+            return intent.model_copy(
+                update={
+                    "from_dc": None,
+                    "to_dc": None,
+                    "battery_id": None,
+                    "dc": None,
+                }
+            )
+        case "curtail_flexible_load":
+            return intent.model_copy(
+                update={
+                    "from_dc": None,
+                    "to_dc": None,
+                    "battery_id": None,
+                    "generator_id": None,
+                    "target_dc": None,
+                }
+            )
+    return intent
