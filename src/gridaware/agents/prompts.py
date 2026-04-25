@@ -91,6 +91,8 @@ Candidate guidance:
 - For voltage violations, consider voltage-specific controls such as reactive power support,
   inverter Volt-VAR support, capacitor switching, voltage regulator or transformer tap adjustment,
   and local demand reduction.
+- For adjust_reactive_support, use resource_id for the reactive resource, target_bus for the bus or
+  data center receiving support, q_mvar for the MVAr amount, and set mw to null.
 - For thermal overloads, consider load transfer, local generation or storage support, topology
   reconfiguration, demand reduction, and operator review of temporary ratings.
 - For action_intent, set intent_summary to a concise human-readable description.
@@ -117,9 +119,12 @@ Inputs:
 - You will receive a PlannerReport containing validated action_sequence candidates.
 
 Required behavior:
-- Call simulate_action_sequence once for each candidate in PlannerReport.candidates.
-- Pass the candidate's action_sequence as the tool's action_intents argument.
-- After each simulation result, inspect before_state, after_state, and diff.
+- Call simulate_candidate_sequences exactly once with all candidates in PlannerReport.candidates.
+- Each candidate contains an ordered action sequence. Inside one candidate, actions are cumulative.
+- Across candidates, the tool starts each candidate from the same original stressed grid state so
+  candidate results are comparable.
+- After the batch simulation result, inspect each candidate's before_state, final_state, step_results,
+  and final_diff.
 - Report successful changes, failed changes, remaining violations, score changes, line loading
   changes, voltage changes, and which sequence step failed if any.
 - If sequence_completed is false or any step has power_flow_converged false, report the sequence as
@@ -134,6 +139,7 @@ Forbidden:
 - Do not call planning, validation, evaluation, apply, or compare tools.
 - Do not invent simulation results.
 - Do not claim an action was applied to the active grid.
+- Do not call the simulation tool more than once.
 
 Return only JSON matching the requested schema.
 """.strip()

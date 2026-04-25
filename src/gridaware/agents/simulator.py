@@ -19,7 +19,9 @@ from gridaware.tool_executor import GridToolRuntime
 
 def simulator_tools() -> list[dict[str, Any]]:
     return [
-        tool for tool in responses_tool_definitions() if tool["name"] == "simulate_action_sequence"
+        tool
+        for tool in responses_tool_definitions()
+        if tool["name"] == "simulate_candidate_sequences"
     ]
 
 
@@ -43,8 +45,8 @@ def run_simulator_agent(
             pydantic_strict_json_schema(SimulatorReport),
             "Simulation report comparing before and after grid states for planner candidates.",
         ),
-        initial_tool_choice="auto",
-        max_tool_rounds=max(4, len(planner_report.candidates) + 4),
+        initial_tool_choice={"type": "function", "name": "simulate_candidate_sequences"},
+        max_tool_rounds=4,
     )
     return SimulatorRunResult(
         report=SimulatorReport.model_validate_json(result.output_text),
@@ -54,7 +56,12 @@ def run_simulator_agent(
 
 def _simulator_user_prompt(planner_report: PlannerReport) -> str:
     return (
-        "Simulate each validated action sequence candidate in this PlannerReport. "
-        "Call simulate_action_sequence once per candidate before returning final JSON.\n\n"
+        "Simulate every candidate in this PlannerReport. "
+        "Call simulate_candidate_sequences exactly once with all PlannerReport.candidates. "
+        "Each candidate must include candidate_id, rank, and action_intents. "
+        "Use candidate_id values like candidate_1, candidate_2, matching each candidate rank. "
+        "Do not simulate only the top-ranked candidate unless this PlannerReport contains only one "
+        "candidate. Do not return final JSON until every candidate has a simulation result or "
+        "validation failure.\n\n"
         f"{json.dumps(planner_report.model_dump(mode='json'), indent=2)}"
     )

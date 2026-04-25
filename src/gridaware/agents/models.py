@@ -86,6 +86,9 @@ class PlannerActionIntent(BaseModel):
     generator_id: str | None
     target_dc: str | None
     dc: str | None
+    resource_id: str | None
+    target_bus: str | None
+    q_mvar: float | None
     target_element: str | None
     control_asset: str | None
     setpoint: float | None

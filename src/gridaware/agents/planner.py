@@ -107,4 +107,19 @@ def _normalize_action_intent(intent):
                     "target_dc": None,
                 }
             )
+        case "adjust_reactive_support":
+            return intent.model_copy(
+                update={
+                    "from_dc": None,
+                    "to_dc": None,
+                    "battery_id": None,
+                    "generator_id": None,
+                    "target_dc": None,
+                    "dc": None,
+                    "resource_id": intent.resource_id or intent.control_asset,
+                    "target_bus": intent.target_bus or intent.target_element,
+                    "q_mvar": intent.q_mvar if intent.q_mvar is not None else intent.setpoint,
+                    "mw": None,
+                }
+            )
     return intent

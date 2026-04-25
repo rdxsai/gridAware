@@ -20,19 +20,28 @@ class FakeResponses:
                 output=[
                     SimpleNamespace(
                         type="function_call",
-                        name="simulate_action_sequence",
+                        name="simulate_candidate_sequences",
                         arguments=json.dumps(
                             {
-                                "action_intents": [
+                                "candidates": [
                                     {
-                                        "type": "curtail_flexible_load",
-                                        "from_dc": None,
-                                        "to_dc": None,
-                                        "battery_id": None,
-                                        "generator_id": None,
-                                        "target_dc": None,
-                                        "dc": "DC_A",
-                                        "mw": 8.0,
+                                        "candidate_id": "candidate_1",
+                                        "rank": 1,
+                                        "action_intents": [
+                                            {
+                                                "type": "curtail_flexible_load",
+                                                "from_dc": None,
+                                                "to_dc": None,
+                                                "battery_id": None,
+                                                "generator_id": None,
+                                                "target_dc": None,
+                                                "dc": "DC_A",
+                                                "resource_id": None,
+                                                "target_bus": None,
+                                                "q_mvar": None,
+                                                "mw": 8.0,
+                                            }
+                                        ],
                                     }
                                 ]
                             }
@@ -60,6 +69,9 @@ class FakeResponses:
                                     "generator_id": None,
                                     "target_dc": None,
                                     "dc": "DC_A",
+                                    "resource_id": None,
+                                    "target_bus": None,
+                                    "q_mvar": None,
                                     "target_element": "DC_A",
                                     "control_asset": "DC_A",
                                     "setpoint": None,
@@ -116,6 +128,9 @@ def test_simulator_agent_uses_action_sequence_tool() -> None:
                             "generator_id": None,
                             "target_dc": None,
                             "dc": "DC_A",
+                            "resource_id": None,
+                            "target_bus": None,
+                            "q_mvar": None,
                             "target_element": "DC_A",
                             "control_asset": "DC_A",
                             "setpoint": None,
@@ -144,6 +159,6 @@ def test_simulator_agent_uses_action_sequence_tool() -> None:
         model="test-model",
     )
 
-    assert [tool["name"] for tool in simulator_tools()] == ["simulate_action_sequence"]
-    assert result.trace.tool_calls[0].name == "simulate_action_sequence"
+    assert [tool["name"] for tool in simulator_tools()] == ["simulate_candidate_sequences"]
+    assert result.trace.tool_calls[0].name == "simulate_candidate_sequences"
     assert result.report.best_candidate_rank == 1
