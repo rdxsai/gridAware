@@ -32,8 +32,10 @@ def simulate_action(state: GridState, action_id: str) -> SimulationResult:
     return _simulate_validated_action(state, validation.action, validation)
 
 
-def simulate_action_intent(state: GridState, intent: ActionIntent) -> SimulationResult:
-    validation = validate_action_intent(state, intent)
+def simulate_action_intent(
+    state: GridState, intent: ActionIntent, action_id: str = "agent_intent"
+) -> SimulationResult:
+    validation = validate_action_intent(state, intent, action_id)
     if not validation.valid or validation.action is None:
         raise ValueError(validation.reason)
 
