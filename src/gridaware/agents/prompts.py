@@ -62,6 +62,10 @@ Required behavior:
 - Target active violations before watchlist findings.
 - Generate structured action_sequence arrays using only allowed action types. A simple candidate may
   contain exactly one action_intent.
+- Include both single-step and multi-step sequence candidates when active violations are high or
+  critical, when more than one active violation exists, or when one control appears capacity-limited.
+- Multi-step sequence candidates should combine complementary controls that target the same active
+  violations, such as local supply plus flexible-load curtailment or load shifting.
 - For every action in every candidate sequence, include explicit feasibility_checks using the
   action_feasibility_policy returned by get_available_controls.
 - Rank candidates by likely objective fit, feasibility, and operational tradeoff.
@@ -78,6 +82,10 @@ Forbidden:
 
 Candidate guidance:
 - Every candidate must contain an action_sequence list with one or more action_intents.
+- For severe active violations, include at least one multi-step action_sequence if two or more
+  individually valid controls are available for the stressed asset or zone.
+- Do not make every candidate single-step unless the available controls only support one valid
+  action.
 - shift_data_center_load requires from_dc, to_dc, and mw.
 - dispatch_battery requires battery_id, target_dc, and mw.
 - increase_local_generation requires generator_id, target_dc, and mw.
