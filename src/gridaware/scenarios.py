@@ -30,8 +30,20 @@ def load_demo_scenario() -> GridState:
                 LineLoading(line="line_7", loading_percent=86.0),
             ],
             data_centers=[
-                DataCenterLoad(id="DC_A", zone="north", load_mw=80.0, flexible_mw=24.0),
-                DataCenterLoad(id="DC_B", zone="south", load_mw=42.0, flexible_mw=18.0),
+                DataCenterLoad(
+                    id="DC_A",
+                    zone="north",
+                    load_mw=80.0,
+                    flexible_mw=24.0,
+                    max_load_mw=95.0,
+                ),
+                DataCenterLoad(
+                    id="DC_B",
+                    zone="south",
+                    load_mw=42.0,
+                    flexible_mw=18.0,
+                    max_load_mw=65.0,
+                ),
             ],
             batteries=[Battery(id="BAT_A", zone="north", available_mw=10.0)],
             local_generators=[

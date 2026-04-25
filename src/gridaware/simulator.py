@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from gridaware.actions import get_action_by_id
+from gridaware.actions import get_action_by_id, validate_action, validate_action_intent
 from gridaware.models import (
     Action,
+    ActionIntent,
+    ActionValidation,
     AppliedAction,
     BusVoltage,
     Evaluation,
@@ -23,6 +25,24 @@ def get_grid_state(state: GridState) -> GridState:
 
 def simulate_action(state: GridState, action_id: str) -> SimulationResult:
     action = get_action_by_id(state, action_id)
+    validation = validate_action(state, action)
+    if not validation.valid or validation.action is None:
+        raise ValueError(validation.reason)
+
+    return _simulate_validated_action(state, validation.action, validation)
+
+
+def simulate_action_intent(state: GridState, intent: ActionIntent) -> SimulationResult:
+    validation = validate_action_intent(state, intent)
+    if not validation.valid or validation.action is None:
+        raise ValueError(validation.reason)
+
+    return _simulate_validated_action(state, validation.action, validation)
+
+
+def _simulate_validated_action(
+    state: GridState, action: Action, validation: ActionValidation
+) -> SimulationResult:
     predicted = _apply_action_to_copy(state, action)
     predicted.violations = _detect_violations(predicted)
     predicted.grid_health_score = _score_grid(predicted)
@@ -38,6 +58,7 @@ def simulate_action(state: GridState, action_id: str) -> SimulationResult:
 
     return SimulationResult(
         action_id=action.action_id,
+        validation=validation,
         success=success,
         remaining_violations=predicted.violations,
         before_score=state.grid_health_score,
@@ -81,23 +102,24 @@ def apply_action(state: GridState, action_id: str) -> AppliedAction:
 
 def _apply_action_to_copy(state: GridState, action: Action) -> GridState:
     predicted = deepcopy(state)
+    mw = float(action.parameters["mw"])
 
     match action.type:
         case "shift_data_center_load":
-            _shift_load(predicted, str(action.parameters["from_dc"]), str(action.parameters["to_dc"]), 15.0)
-            _adjust_line(predicted, "line_4", -24.3)
-            _adjust_voltage(predicted, "DC_A", 0.04)
-            _adjust_line(predicted, "line_7", 8.0)
+            _shift_load(predicted, str(action.parameters["from_dc"]), str(action.parameters["to_dc"]), mw)
+            _adjust_line(predicted, "line_4", round(-1.62 * mw, 1))
+            _adjust_voltage(predicted, "DC_A", round(0.0027 * mw, 3))
+            _adjust_line(predicted, "line_7", round(0.53 * mw, 1))
         case "dispatch_battery":
-            _adjust_line(predicted, "line_4", -15.0)
-            _adjust_voltage(predicted, "DC_A", 0.025)
+            _adjust_line(predicted, "line_4", round(-1.5 * mw, 1))
+            _adjust_voltage(predicted, "DC_A", round(0.0025 * mw, 3))
         case "increase_local_generation":
-            _adjust_line(predicted, "line_4", -18.0)
-            _adjust_voltage(predicted, "DC_A", 0.03)
+            _adjust_line(predicted, "line_4", round(-1.5 * mw, 1))
+            _adjust_voltage(predicted, "DC_A", round(0.0025 * mw, 3))
         case "curtail_flexible_load":
-            _shift_load(predicted, str(action.parameters["dc"]), str(action.parameters["dc"]), 8.0)
-            _adjust_line(predicted, "line_4", -9.0)
-            _adjust_voltage(predicted, "DC_A", 0.015)
+            _shift_load(predicted, str(action.parameters["dc"]), str(action.parameters["dc"]), mw)
+            _adjust_line(predicted, "line_4", round(-1.12 * mw, 1))
+            _adjust_voltage(predicted, "DC_A", round(0.0019 * mw, 3))
 
     return predicted
 

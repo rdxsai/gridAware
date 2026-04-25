@@ -37,6 +37,7 @@ class DataCenterLoad(BaseModel):
     zone: str
     load_mw: float
     flexible_mw: float
+    max_load_mw: float
 
 
 class Battery(BaseModel):
@@ -70,6 +71,23 @@ class Action(BaseModel):
     estimated_cost: float
 
 
+class ActionIntent(BaseModel):
+    type: ActionType
+    from_dc: str | None = None
+    to_dc: str | None = None
+    battery_id: str | None = None
+    generator_id: str | None = None
+    target_dc: str | None = None
+    dc: str | None = None
+    mw: float
+
+
+class ActionValidation(BaseModel):
+    valid: bool
+    reason: str
+    action: Action | None = None
+
+
 class LineLoadingChange(BaseModel):
     line: str
     before_percent: float
@@ -84,6 +102,7 @@ class VoltageChange(BaseModel):
 
 class SimulationResult(BaseModel):
     action_id: str
+    validation: ActionValidation
     success: bool
     remaining_violations: list[Violation]
     before_score: int
