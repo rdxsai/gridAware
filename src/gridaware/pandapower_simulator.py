@@ -8,7 +8,12 @@ from pandapower.auxiliary import LoadflowNotConverged
 
 from gridaware.actions import validate_action_intent
 from gridaware.models import ActionIntent, Battery, GridState, LocalGenerator
-from gridaware.scenarios import DataCenterSpec, ScenarioBundle, _grid_state_from_pandapower
+from gridaware.scenarios import (
+    DataCenterSpec,
+    ReactiveSupportSpec,
+    ScenarioBundle,
+    _grid_state_from_pandapower,
+)
 
 
 def simulate_action_intent_on_pandapower(
@@ -50,6 +55,7 @@ def simulate_action_sequence_on_pandapower(
     data_centers = deepcopy(bundle.data_centers)
     batteries = deepcopy(bundle.batteries)
     local_generators = deepcopy(bundle.local_generators)
+    reactive_resources = deepcopy(bundle.reactive_resources)
     current_state = bundle.grid_state
     step_results: list[dict[str, Any]] = []
 
@@ -85,7 +91,14 @@ def simulate_action_sequence_on_pandapower(
 
         before_state = current_state
         try:
-            _apply_intent_to_net(net, data_centers, batteries, local_generators, intent)
+            _apply_intent_to_net(
+                net,
+                data_centers,
+                batteries,
+                local_generators,
+                reactive_resources,
+                intent,
+            )
             pp.runpp(net, numba=False, max_iteration=30)
             after_state = _grid_state_from_pandapower(
                 net,
@@ -93,6 +106,7 @@ def simulate_action_sequence_on_pandapower(
                 data_centers,
                 batteries,
                 local_generators,
+                reactive_resources,
                 bundle.metadata,
             )
         except (LoadflowNotConverged, ValueError) as exc:
@@ -199,6 +213,7 @@ def _apply_intent_to_net(
     data_centers: list[DataCenterSpec],
     batteries: list[Battery],
     local_generators: list[LocalGenerator],
+    reactive_resources: list[ReactiveSupportSpec],
     intent: ActionIntent,
 ) -> None:
     match intent.type:

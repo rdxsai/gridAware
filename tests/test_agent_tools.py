@@ -97,6 +97,7 @@ def test_tool_runtime_returns_case33bw_scenario_specific_controls() -> None:
         "dispatch_battery",
         "increase_local_generation",
         "curtail_flexible_load",
+        "adjust_reactive_support",
     ]
     assert result["data_centers"] == [
         {
@@ -120,6 +121,10 @@ def test_tool_runtime_returns_case33bw_scenario_specific_controls() -> None:
     assert result["local_generators"] == [
         {"id": "GEN_A", "zone": "feeder_tail", "available_headroom_mw": 0.5}
     ]
+    assert result["reactive_resources"] == [
+        {"id": "VAR_A", "zone": "feeder_tail", "available_mvar": 0.1}
+    ]
+    assert result["control_assets"]["reactive_resources"] == result["reactive_resources"]
 
 
 def test_tool_runtime_returns_no_controls_for_untouched_case33bw_baseline() -> None:

@@ -14,6 +14,7 @@ from gridaware.models import (
     GridState,
     LineLoading,
     LocalGenerator,
+    ReactiveResource,
     ScenarioMetadata,
     Violation,
 )
@@ -34,6 +35,11 @@ ALLOWED_DATA_CENTER_ACTIONS = [
     "dispatch_battery",
     "increase_local_generation",
     "curtail_flexible_load",
+]
+
+ALLOWED_DATA_CENTER_VOLTAGE_ACTIONS = [
+    *ALLOWED_DATA_CENTER_ACTIONS,
+    "adjust_reactive_support",
 ]
 
 
@@ -59,12 +65,21 @@ class DataCenterSpec:
 
 
 @dataclass
+class ReactiveSupportSpec:
+    resource_id: str
+    bus: int
+    zone: str
+    available_mvar: float
+
+
+@dataclass
 class ScenarioBundle:
     scenario_id: AgentGridScenario
     net: pp.pandapowerNet
     data_centers: list[DataCenterSpec]
     batteries: list[Battery]
     local_generators: list[LocalGenerator]
+    reactive_resources: list[ReactiveSupportSpec]
     allowed_action_types: list[str]
     metadata: ScenarioMetadata
     grid_state: GridState
@@ -81,9 +96,15 @@ def load_agent_scenario(
 ) -> ScenarioBundle:
     """Build a benchmark pandapower grid variant and keep the raw net for simulation."""
 
-    net, data_centers, batteries, local_generators, allowed_actions, metadata = (
-        _build_benchmark_grid(scenario_id)
-    )
+    (
+        net,
+        data_centers,
+        batteries,
+        local_generators,
+        reactive_resources,
+        allowed_actions,
+        metadata,
+    ) = _build_benchmark_grid(scenario_id)
     pp.runpp(net, numba=False, max_iteration=30)
     grid_state = _grid_state_from_pandapower(
         net,
@@ -91,6 +112,7 @@ def load_agent_scenario(
         data_centers,
         batteries,
         local_generators,
+        reactive_resources,
         metadata,
     )
     return ScenarioBundle(
@@ -99,6 +121,7 @@ def load_agent_scenario(
         data_centers=data_centers,
         batteries=batteries,
         local_generators=local_generators,
+        reactive_resources=reactive_resources,
         allowed_action_types=allowed_actions,
         metadata=metadata,
         grid_state=grid_state,
@@ -118,6 +141,7 @@ def _build_benchmark_grid(
     list[DataCenterSpec],
     list[Battery],
     list[LocalGenerator],
+    list[ReactiveSupportSpec],
     list[str],
     ScenarioMetadata,
 ]:
@@ -137,6 +161,7 @@ def _build_case33bw_baseline() -> tuple[
     list[DataCenterSpec],
     list[Battery],
     list[LocalGenerator],
+    list[ReactiveSupportSpec],
     list[str],
     ScenarioMetadata,
 ]:
@@ -154,7 +179,7 @@ def _build_case33bw_baseline() -> tuple[
             "The original case33bw ampacity values are not calibrated for line-overload demos.",
         ],
     )
-    return net, [], [], [], [], metadata
+    return net, [], [], [], [], [], metadata
 
 
 def _build_case33bw_data_center_spike() -> tuple[
@@ -162,6 +187,7 @@ def _build_case33bw_data_center_spike() -> tuple[
     list[DataCenterSpec],
     list[Battery],
     list[LocalGenerator],
+    list[ReactiveSupportSpec],
     list[str],
     ScenarioMetadata,
 ]:
@@ -218,6 +244,7 @@ def _build_case33bw_data_center_spike() -> tuple[
             "Added DC_B at mid-feeder bus 21 with 0.25 MW / 0.08 MVAr demand and 0.55 MW receiving headroom.",
             "Added BAT_A in the feeder_tail zone with 0.50 MW available.",
             "Added GEN_A in the feeder_tail zone with 0.50 MW available headroom.",
+            "Added VAR_A in the feeder_tail zone with 0.10 MVAr reactive support available.",
             "Set line_25 ampacity to 0.08 kA to represent a constrained upstream feeder corridor.",
         ],
         limitations=[
@@ -231,7 +258,8 @@ def _build_case33bw_data_center_spike() -> tuple[
         data_centers,
         [Battery(id="BAT_A", zone="feeder_tail", available_mw=0.50)],
         [LocalGenerator(id="GEN_A", zone="feeder_tail", available_headroom_mw=0.50)],
-        ALLOWED_DATA_CENTER_ACTIONS.copy(),
+        [ReactiveSupportSpec(resource_id="VAR_A", bus=32, zone="feeder_tail", available_mvar=0.10)],
+        ALLOWED_DATA_CENTER_VOLTAGE_ACTIONS.copy(),
         metadata,
     )
 
@@ -241,6 +269,7 @@ def _build_case33bw_data_center_spike_hard() -> tuple[
     list[DataCenterSpec],
     list[Battery],
     list[LocalGenerator],
+    list[ReactiveSupportSpec],
     list[str],
     ScenarioMetadata,
 ]:
@@ -298,6 +327,7 @@ def _build_case33bw_data_center_spike_hard() -> tuple[
             "Added DC_B at mid-feeder bus 21 with 0.35 MW / 0.112 MVAr demand and 0.35 MW receiving headroom.",
             "Added BAT_A in the feeder_tail zone with 0.25 MW available.",
             "Added GEN_A in the feeder_tail zone with 0.25 MW available headroom.",
+            "Added VAR_A in the feeder_tail zone with 0.10 MVAr reactive support available.",
             "Set line_25 ampacity to 0.08 kA to represent a constrained upstream feeder corridor.",
         ],
         limitations=[
@@ -311,7 +341,8 @@ def _build_case33bw_data_center_spike_hard() -> tuple[
         data_centers,
         [Battery(id="BAT_A", zone="feeder_tail", available_mw=0.25)],
         [LocalGenerator(id="GEN_A", zone="feeder_tail", available_headroom_mw=0.25)],
-        ALLOWED_DATA_CENTER_ACTIONS.copy(),
+        [ReactiveSupportSpec(resource_id="VAR_A", bus=32, zone="feeder_tail", available_mvar=0.10)],
+        ALLOWED_DATA_CENTER_VOLTAGE_ACTIONS.copy(),
         metadata,
     )
 
@@ -323,6 +354,7 @@ def _build_cigre_mv_grid(
     list[DataCenterSpec],
     list[Battery],
     list[LocalGenerator],
+    list[ReactiveSupportSpec],
     list[str],
     ScenarioMetadata,
 ]:
@@ -401,6 +433,7 @@ def _build_cigre_mv_grid(
         data_centers,
         [Battery(id="BAT_A", zone="north", available_mw=10.0)],
         [LocalGenerator(id="GEN_A", zone="north", available_headroom_mw=12.0)],
+        [],
         ALLOWED_DATA_CENTER_ACTIONS.copy(),
         metadata,
     )
@@ -411,6 +444,7 @@ def _build_cigre_lv_grid() -> tuple[
     list[DataCenterSpec],
     list[Battery],
     list[LocalGenerator],
+    list[ReactiveSupportSpec],
     list[str],
     ScenarioMetadata,
 ]:
@@ -469,6 +503,7 @@ def _build_cigre_lv_grid() -> tuple[
         data_centers,
         [Battery(id="BAT_A", zone="edge", available_mw=1.5)],
         [LocalGenerator(id="GEN_A", zone="edge", available_headroom_mw=1.0)],
+        [],
         ALLOWED_DATA_CENTER_ACTIONS.copy(),
         metadata,
     )
@@ -480,6 +515,7 @@ def _grid_state_from_pandapower(
     data_center_specs: list[DataCenterSpec],
     batteries: list[Battery],
     local_generators: list[LocalGenerator],
+    reactive_resources: list[ReactiveSupportSpec],
     metadata: ScenarioMetadata,
 ) -> GridState:
     bus_voltages = _agent_bus_voltages(net, data_center_specs)
@@ -507,6 +543,14 @@ def _grid_state_from_pandapower(
         data_centers=data_centers,
         batteries=batteries,
         local_generators=local_generators,
+        reactive_resources=[
+            ReactiveResource(
+                id=resource.resource_id,
+                zone=resource.zone,
+                available_mvar=round(resource.available_mvar, 4),
+            )
+            for resource in reactive_resources
+        ],
         violations=violations,
         grid_health_score=_score_grid(bus_voltages, line_loadings, violations),
     )

@@ -115,6 +115,37 @@ class GridToolRuntime:
                 generator.model_dump(mode="json")
                 for generator in self.active_state.local_generators
             ],
+            "reactive_resources": [
+                resource.model_dump(mode="json")
+                for resource in self.active_state.reactive_resources
+            ],
+            "control_assets": {
+                "data_centers": [
+                    {
+                        "id": dc.id,
+                        "zone": dc.zone,
+                        "load_mw": dc.load_mw,
+                        "flexible_mw": dc.flexible_mw,
+                        "max_load_mw": dc.max_load_mw,
+                        "receiving_headroom_mw": round(dc.max_load_mw - dc.load_mw, 3),
+                    }
+                    for dc in self.active_state.data_centers
+                ],
+                "batteries": [
+                    battery.model_dump(mode="json") for battery in self.active_state.batteries
+                ],
+                "local_generators": [
+                    generator.model_dump(mode="json")
+                    for generator in self.active_state.local_generators
+                ],
+                "reactive_resources": [
+                    resource.model_dump(mode="json")
+                    for resource in self.active_state.reactive_resources
+                ],
+                "capacitor_banks": [],
+                "transformers": [],
+                "switches": [],
+            },
             "action_feasibility_policy": _action_feasibility_policy(),
         }
 

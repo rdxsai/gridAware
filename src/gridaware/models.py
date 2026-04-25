@@ -11,6 +11,7 @@ ActionType = Literal[
     "dispatch_battery",
     "increase_local_generation",
     "curtail_flexible_load",
+    "adjust_reactive_support",
 ]
 
 
@@ -52,6 +53,12 @@ class LocalGenerator(BaseModel):
     available_headroom_mw: float
 
 
+class ReactiveResource(BaseModel):
+    id: str
+    zone: str
+    available_mvar: float
+
+
 class ScenarioMetadata(BaseModel):
     scenario_id: str
     base_network: str
@@ -69,6 +76,7 @@ class GridState(BaseModel):
     data_centers: list[DataCenterLoad]
     batteries: list[Battery] = Field(default_factory=list)
     local_generators: list[LocalGenerator] = Field(default_factory=list)
+    reactive_resources: list[ReactiveResource] = Field(default_factory=list)
     violations: list[Violation]
     grid_health_score: int
 
@@ -89,7 +97,10 @@ class ActionIntent(BaseModel):
     generator_id: str | None = None
     target_dc: str | None = None
     dc: str | None = None
-    mw: float
+    resource_id: str | None = None
+    target_bus: str | None = None
+    q_mvar: float | None = None
+    mw: float | None = None
 
 
 class ActionValidation(BaseModel):

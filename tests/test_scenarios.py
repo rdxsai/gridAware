@@ -51,6 +51,8 @@ def test_case33bw_data_center_spike_has_clear_documented_stress() -> None:
     assert state.data_centers[0].zone == "feeder_tail"
     assert state.batteries[0].zone == "feeder_tail"
     assert state.local_generators[0].zone == "feeder_tail"
+    assert state.reactive_resources[0].id == "VAR_A"
+    assert state.reactive_resources[0].available_mvar == 0.1
     assert any(
         violation.type == "line_overload" and violation.element_id == "line_25"
         for violation in state.violations
