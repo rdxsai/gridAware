@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from gridaware.models import Action, ActionIntent, ActionIntentValidation, ActionValidation, GridState
+from gridaware.models import (
+    Action,
+    ActionIntent,
+    ActionIntentValidation,
+    ActionValidation,
+    GridState,
+)
 
 
 def propose_grid_actions(state: GridState, target_violation: str | None = None) -> list[Action]:
@@ -60,7 +66,10 @@ def action_to_intent(action: Action) -> ActionIntent:
         generator_id=_string_param(params, "generator_id"),
         target_dc=_string_param(params, "target_dc"),
         dc=_string_param(params, "dc"),
-        mw=float(params["mw"]),
+        resource_id=_string_param(params, "resource_id"),
+        target_bus=_string_param(params, "target_bus"),
+        q_mvar=_float_param(params, "q_mvar"),
+        mw=_float_param(params, "mw"),
     )
 
 
@@ -78,6 +87,8 @@ def validate_action_intent(
             return _validate_increase_generation(state, intent, action_id)
         case "curtail_flexible_load":
             return _validate_curtail_load(state, intent, action_id)
+        case "adjust_reactive_support":
+            return _validate_adjust_reactive_support(state, intent, action_id)
 
 
 def validate_action(state: GridState, action: Action) -> ActionValidation:
@@ -97,6 +108,8 @@ def validate_action_intent_for_planner(
             return _validate_increase_generation_for_planner(state, intent)
         case "curtail_flexible_load":
             return _validate_curtail_load_for_planner(state, intent)
+        case "adjust_reactive_support":
+            return _validate_adjust_reactive_support_for_planner(state, intent)
 
 
 def _stressed_data_center(state: GridState) -> str:
@@ -104,7 +117,9 @@ def _stressed_data_center(state: GridState) -> str:
     return low_voltage.bus if low_voltage.bus.startswith("DC_") else "DC_A"
 
 
-def _validate_shift_load(state: GridState, intent: ActionIntent, action_id: str) -> ActionValidation:
+def _validate_shift_load(
+    state: GridState, intent: ActionIntent, action_id: str
+) -> ActionValidation:
     if not intent.from_dc or not intent.to_dc:
         return _invalid("shift_data_center_load requires from_dc and to_dc")
     if intent.from_dc == intent.to_dc:
@@ -116,7 +131,7 @@ def _validate_shift_load(state: GridState, intent: ActionIntent, action_id: str)
         return _invalid(f"Unknown source data center: {intent.from_dc}")
     if target is None:
         return _invalid(f"Unknown target data center: {intent.to_dc}")
-    if intent.mw <= 0:
+    if intent.mw is None or intent.mw <= 0:
         return _invalid("mw must be greater than zero")
     if intent.mw > source.flexible_mw:
         return _invalid(f"{source.id} has only {source.flexible_mw} MW flexible load")
@@ -134,7 +149,9 @@ def _validate_shift_load(state: GridState, intent: ActionIntent, action_id: str)
     )
 
 
-def _validate_shift_load_for_planner(state: GridState, intent: ActionIntent) -> ActionIntentValidation:
+def _validate_shift_load_for_planner(
+    state: GridState, intent: ActionIntent
+) -> ActionIntentValidation:
     passed: list[str] = []
     failed: list[str] = []
     repair: list[str] = []
@@ -159,13 +176,13 @@ def _validate_shift_load_for_planner(state: GridState, intent: ActionIntent) -> 
         failed.append("from_dc != to_dc")
         repair.append("Use different source and destination data centers.")
 
-    if source and intent.mw <= source.flexible_mw:
+    if source and intent.mw is not None and intent.mw <= source.flexible_mw:
         passed.append(f"mw <= from_dc.flexible_mw: {intent.mw:g} <= {source.flexible_mw:g}")
-    elif source:
+    elif source and intent.mw is not None:
         failed.append(f"mw <= from_dc.flexible_mw: {intent.mw:g} > {source.flexible_mw:g}")
         repair.append(f"Reduce mw to <= {source.flexible_mw:g}.")
 
-    if target:
+    if target and intent.mw is not None:
         headroom = target.max_load_mw - target.load_mw
         if intent.mw <= headroom:
             passed.append(f"mw <= to_dc.receiving_headroom_mw: {intent.mw:g} <= {headroom:g}")
@@ -174,11 +191,17 @@ def _validate_shift_load_for_planner(state: GridState, intent: ActionIntent) -> 
             repair.append(f"Reduce mw to <= {headroom:g} or choose another destination.")
 
     _check_positive_mw(intent, passed, failed, repair)
-    normalized = _normalized_shift_intent(source.id, target.id, intent.mw) if not failed and source and target else None
+    normalized = (
+        _normalized_shift_intent(source.id, target.id, intent.mw)
+        if not failed and source and target and intent.mw is not None
+        else None
+    )
     return _planner_validation(intent, normalized, passed, failed, repair)
 
 
-def _validate_dispatch_battery(state: GridState, intent: ActionIntent, action_id: str) -> ActionValidation:
+def _validate_dispatch_battery(
+    state: GridState, intent: ActionIntent, action_id: str
+) -> ActionValidation:
     if not intent.battery_id or not intent.target_dc:
         return _invalid("dispatch_battery requires battery_id and target_dc")
 
@@ -188,7 +211,7 @@ def _validate_dispatch_battery(state: GridState, intent: ActionIntent, action_id
         return _invalid(f"Unknown battery: {intent.battery_id}")
     if target is None:
         return _invalid(f"Unknown target data center: {intent.target_dc}")
-    if intent.mw <= 0:
+    if intent.mw is None or intent.mw <= 0:
         return _invalid("mw must be greater than zero")
     if intent.mw > battery.available_mw:
         return _invalid(f"{battery.id} has only {battery.available_mw} MW available")
@@ -225,9 +248,9 @@ def _validate_dispatch_battery_for_planner(
         failed.append(f"target_dc exists in data_centers: {intent.target_dc}")
         repair.append("Choose target_dc from available data_centers.")
 
-    if battery and intent.mw <= battery.available_mw:
+    if battery and intent.mw is not None and intent.mw <= battery.available_mw:
         passed.append(f"mw <= battery.available_mw: {intent.mw:g} <= {battery.available_mw:g}")
-    elif battery:
+    elif battery and intent.mw is not None:
         failed.append(f"mw <= battery.available_mw: {intent.mw:g} > {battery.available_mw:g}")
         repair.append(f"Reduce mw to <= {battery.available_mw:g}.")
 
@@ -240,7 +263,7 @@ def _validate_dispatch_battery_for_planner(
     _check_positive_mw(intent, passed, failed, repair)
     normalized = (
         _normalized_battery_intent(battery.id, target.id, intent.mw)
-        if not failed and battery and target
+        if not failed and battery and target and intent.mw is not None
         else None
     )
     return _planner_validation(intent, normalized, passed, failed, repair)
@@ -260,7 +283,7 @@ def _validate_increase_generation(
         return _invalid(f"Unknown local generator: {intent.generator_id}")
     if target is None:
         return _invalid(f"Unknown target data center: {intent.target_dc}")
-    if intent.mw <= 0:
+    if intent.mw is None or intent.mw <= 0:
         return _invalid("mw must be greater than zero")
     if intent.mw > generator.available_headroom_mw:
         return _invalid(f"{generator.id} has only {generator.available_headroom_mw} MW headroom")
@@ -299,12 +322,12 @@ def _validate_increase_generation_for_planner(
         failed.append(f"target_dc exists in data_centers: {intent.target_dc}")
         repair.append("Choose target_dc from available data_centers.")
 
-    if generator and intent.mw <= generator.available_headroom_mw:
+    if generator and intent.mw is not None and intent.mw <= generator.available_headroom_mw:
         passed.append(
             f"mw <= generator.available_headroom_mw: {intent.mw:g} <= "
             f"{generator.available_headroom_mw:g}"
         )
-    elif generator:
+    elif generator and intent.mw is not None:
         failed.append(
             f"mw <= generator.available_headroom_mw: {intent.mw:g} > "
             f"{generator.available_headroom_mw:g}"
@@ -320,20 +343,22 @@ def _validate_increase_generation_for_planner(
     _check_positive_mw(intent, passed, failed, repair)
     normalized = (
         _normalized_generation_intent(generator.id, target.id, intent.mw)
-        if not failed and generator and target
+        if not failed and generator and target and intent.mw is not None
         else None
     )
     return _planner_validation(intent, normalized, passed, failed, repair)
 
 
-def _validate_curtail_load(state: GridState, intent: ActionIntent, action_id: str) -> ActionValidation:
+def _validate_curtail_load(
+    state: GridState, intent: ActionIntent, action_id: str
+) -> ActionValidation:
     if not intent.dc:
         return _invalid("curtail_flexible_load requires dc")
 
     dc = _data_center(state, intent.dc)
     if dc is None:
         return _invalid(f"Unknown data center: {intent.dc}")
-    if intent.mw <= 0:
+    if intent.mw is None or intent.mw <= 0:
         return _invalid("mw must be greater than zero")
     if intent.mw > dc.flexible_mw:
         return _invalid(f"{dc.id} has only {dc.flexible_mw} MW flexible load")
@@ -349,7 +374,9 @@ def _validate_curtail_load(state: GridState, intent: ActionIntent, action_id: st
     )
 
 
-def _validate_curtail_load_for_planner(state: GridState, intent: ActionIntent) -> ActionIntentValidation:
+def _validate_curtail_load_for_planner(
+    state: GridState, intent: ActionIntent
+) -> ActionIntentValidation:
     passed: list[str] = []
     failed: list[str] = []
     repair: list[str] = []
@@ -361,14 +388,103 @@ def _validate_curtail_load_for_planner(state: GridState, intent: ActionIntent) -
         failed.append(f"dc exists in data_centers: {intent.dc}")
         repair.append("Choose dc from available data_centers.")
 
-    if dc and intent.mw <= dc.flexible_mw:
+    if dc and intent.mw is not None and intent.mw <= dc.flexible_mw:
         passed.append(f"mw <= dc.flexible_mw: {intent.mw:g} <= {dc.flexible_mw:g}")
-    elif dc:
+    elif dc and intent.mw is not None:
         failed.append(f"mw <= dc.flexible_mw: {intent.mw:g} > {dc.flexible_mw:g}")
         repair.append(f"Reduce mw to <= {dc.flexible_mw:g}.")
 
     _check_positive_mw(intent, passed, failed, repair)
-    normalized = _normalized_curtail_intent(dc.id, intent.mw) if not failed and dc else None
+    normalized = (
+        _normalized_curtail_intent(dc.id, intent.mw)
+        if not failed and dc and intent.mw is not None
+        else None
+    )
+    return _planner_validation(intent, normalized, passed, failed, repair)
+
+
+def _validate_adjust_reactive_support(
+    state: GridState, intent: ActionIntent, action_id: str
+) -> ActionValidation:
+    if not intent.resource_id or not intent.target_bus:
+        return _invalid("adjust_reactive_support requires resource_id and target_bus")
+
+    resource = _reactive_resource(state, intent.resource_id)
+    target_voltage = _bus_voltage(state, intent.target_bus)
+    target_zone = _target_zone(state, intent.target_bus)
+    if resource is None:
+        return _invalid(f"Unknown reactive resource: {intent.resource_id}")
+    if target_voltage is None:
+        return _invalid(f"Unknown target bus: {intent.target_bus}")
+    if intent.q_mvar is None or intent.q_mvar <= 0:
+        return _invalid("q_mvar must be greater than zero")
+    if intent.q_mvar > resource.available_mvar:
+        return _invalid(f"{resource.id} has only {resource.available_mvar} MVAr available")
+    if target_zone is not None and resource.zone != target_zone:
+        return _invalid(f"{resource.id} zone {resource.zone} does not support {target_zone}")
+
+    return _valid(
+        Action(
+            action_id=action_id,
+            type=intent.type,
+            description=(
+                f"Inject {intent.q_mvar:g} MVAr reactive support from {resource.id} "
+                f"toward {intent.target_bus}."
+            ),
+            parameters={
+                "resource_id": resource.id,
+                "target_bus": intent.target_bus,
+                "q_mvar": intent.q_mvar,
+            },
+            estimated_cost=2.5,
+        )
+    )
+
+
+def _validate_adjust_reactive_support_for_planner(
+    state: GridState, intent: ActionIntent
+) -> ActionIntentValidation:
+    passed: list[str] = []
+    failed: list[str] = []
+    repair: list[str] = []
+    resource = _reactive_resource(state, intent.resource_id) if intent.resource_id else None
+    target_voltage = _bus_voltage(state, intent.target_bus) if intent.target_bus else None
+    target_zone = _target_zone(state, intent.target_bus) if intent.target_bus else None
+
+    if resource:
+        passed.append(f"resource_id exists in reactive_resources: {resource.id}")
+    else:
+        failed.append(f"resource_id exists in reactive_resources: {intent.resource_id}")
+        repair.append("Choose resource_id from available reactive_resources.")
+
+    if target_voltage:
+        passed.append(f"target_bus exists in bus_voltages: {target_voltage.bus}")
+    else:
+        failed.append(f"target_bus exists in bus_voltages: {intent.target_bus}")
+        repair.append("Choose target_bus from available bus_voltages.")
+
+    if resource and intent.q_mvar is not None and intent.q_mvar <= resource.available_mvar:
+        passed.append(
+            f"q_mvar <= resource.available_mvar: {intent.q_mvar:g} <= {resource.available_mvar:g}"
+        )
+    elif resource and intent.q_mvar is not None:
+        failed.append(
+            f"q_mvar <= resource.available_mvar: {intent.q_mvar:g} > {resource.available_mvar:g}"
+        )
+        repair.append(f"Reduce q_mvar to <= {resource.available_mvar:g}.")
+
+    if resource and target_zone and resource.zone == target_zone:
+        passed.append(f"resource.zone supports target_bus zone: {resource.zone} == {target_zone}")
+    elif resource and target_zone:
+        failed.append(f"resource.zone supports target_bus zone: {resource.zone} != {target_zone}")
+        repair.append("Choose a reactive resource in the target bus zone.")
+
+    _check_positive_q_mvar(intent, passed, failed, repair)
+    normalized = (
+        _normalized_reactive_support_intent(resource.id, target_voltage.bus, intent.q_mvar)
+        if not failed and resource and target_voltage and intent.q_mvar is not None
+        else None
+    )
     return _planner_validation(intent, normalized, passed, failed, repair)
 
 
@@ -376,13 +492,35 @@ def _data_center(state: GridState, data_center_id: str):
     return next((dc for dc in state.data_centers if dc.id == data_center_id), None)
 
 
+def _reactive_resource(state: GridState, resource_id: str | None):
+    return next(
+        (resource for resource in state.reactive_resources if resource.id == resource_id), None
+    )
+
+
+def _bus_voltage(state: GridState, bus_id: str | None):
+    return next((voltage for voltage in state.bus_voltages if voltage.bus == bus_id), None)
+
+
+def _target_zone(state: GridState, bus_id: str | None) -> str | None:
+    dc = _data_center(state, bus_id) if bus_id else None
+    return dc.zone if dc else None
+
+
 def _string_param(params: dict[str, str | float], key: str) -> str | None:
     value = params.get(key)
     return value if isinstance(value, str) else None
 
 
+def _float_param(params: dict[str, str | float], key: str) -> float | None:
+    value = params.get(key)
+    return float(value) if isinstance(value, (int, float)) else None
+
+
 def _valid(action: Action) -> ActionValidation:
-    return ActionValidation(valid=True, reason="Action is feasible for the current grid state.", action=action)
+    return ActionValidation(
+        valid=True, reason="Action is feasible for the current grid state.", action=action
+    )
 
 
 def _invalid(reason: str) -> ActionValidation:
@@ -412,11 +550,30 @@ def _check_positive_mw(
     failed: list[str],
     repair: list[str],
 ) -> None:
-    if intent.mw > 0:
+    if intent.mw is not None and intent.mw > 0:
         passed.append(f"mw > 0: {intent.mw:g} > 0")
+    elif intent.mw is None:
+        failed.append("mw > 0: missing")
+        repair.append("Use a positive mw value.")
     else:
         failed.append(f"mw > 0: {intent.mw:g} <= 0")
         repair.append("Use a positive mw value.")
+
+
+def _check_positive_q_mvar(
+    intent: ActionIntent,
+    passed: list[str],
+    failed: list[str],
+    repair: list[str],
+) -> None:
+    if intent.q_mvar is not None and intent.q_mvar > 0:
+        passed.append(f"q_mvar > 0: {intent.q_mvar:g} > 0")
+    elif intent.q_mvar is None:
+        failed.append("q_mvar > 0: missing")
+        repair.append("Use a positive q_mvar value.")
+    else:
+        failed.append(f"q_mvar > 0: {intent.q_mvar:g} <= 0")
+        repair.append("Use a positive q_mvar value.")
 
 
 def _normalized_shift_intent(from_dc: str, to_dc: str, mw: float) -> ActionIntent:
@@ -468,4 +625,22 @@ def _normalized_curtail_intent(dc: str, mw: float) -> ActionIntent:
         target_dc=None,
         dc=dc,
         mw=mw,
+    )
+
+
+def _normalized_reactive_support_intent(
+    resource_id: str, target_bus: str, q_mvar: float
+) -> ActionIntent:
+    return ActionIntent(
+        type="adjust_reactive_support",
+        from_dc=None,
+        to_dc=None,
+        battery_id=None,
+        generator_id=None,
+        target_dc=None,
+        dc=None,
+        resource_id=resource_id,
+        target_bus=target_bus,
+        q_mvar=q_mvar,
+        mw=None,
     )

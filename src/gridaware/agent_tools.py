@@ -8,6 +8,7 @@ ACTION_TYPE_ENUM = [
     "dispatch_battery",
     "increase_local_generation",
     "curtail_flexible_load",
+    "adjust_reactive_support",
 ]
 
 
@@ -53,7 +54,8 @@ def responses_tool_definitions() -> list[dict[str, Any]]:
             "name": "get_available_controls",
             "description": (
                 "Return the allowed mitigation action types and controllable grid assets, including "
-                "data center flexibility, receiving headroom, batteries, and local generation."
+                "data center flexibility, receiving headroom, batteries, local generation, and "
+                "reactive support."
             ),
             "parameters": _empty_parameters(),
             "strict": True,
@@ -248,8 +250,14 @@ def _action_intent_schema() -> dict[str, Any]:
             "generator_id": nullable_string,
             "target_dc": nullable_string,
             "dc": nullable_string,
+            "resource_id": nullable_string,
+            "target_bus": nullable_string,
+            "q_mvar": {
+                "type": ["number", "null"],
+                "description": "Reactive power in MVAr for voltage-support actions.",
+            },
             "mw": {
-                "type": "number",
+                "type": ["number", "null"],
                 "description": "Megawatts to shift, dispatch, generate, or curtail.",
             },
         },
@@ -261,6 +269,9 @@ def _action_intent_schema() -> dict[str, Any]:
             "generator_id",
             "target_dc",
             "dc",
+            "resource_id",
+            "target_bus",
+            "q_mvar",
             "mw",
         ],
         "additionalProperties": False,

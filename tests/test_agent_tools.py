@@ -125,6 +125,21 @@ def test_tool_runtime_returns_case33bw_scenario_specific_controls() -> None:
         {"id": "VAR_A", "zone": "feeder_tail", "available_mvar": 0.1}
     ]
     assert result["control_assets"]["reactive_resources"] == result["reactive_resources"]
+    assert result["action_feasibility_policy"]["adjust_reactive_support"] == {
+        "required_fields": ["resource_id", "target_bus", "q_mvar"],
+        "valid_checks": [
+            "resource_id exists in reactive_resources",
+            "target_bus exists in bus_voltages",
+            "q_mvar <= resource.available_mvar",
+            "resource.zone should match target_bus zone or support the target zone",
+        ],
+        "forbidden_checks": [
+            "mw",
+            "target_dc.receiving_headroom_mw",
+            "battery.available_mw",
+            "generator.available_headroom_mw",
+        ],
+    }
 
 
 def test_tool_runtime_returns_no_controls_for_untouched_case33bw_baseline() -> None:
@@ -181,6 +196,59 @@ def test_tool_runtime_validates_action_intent() -> None:
     assert valid["validation"]["normalized_action_intent"]["to_dc"] == "DC_B"
     assert invalid["validation"]["valid"] is False
     assert invalid["validation"]["failed_checks"]
+
+
+def test_tool_runtime_validates_reactive_support_action_intent() -> None:
+    runtime = GridToolRuntime(
+        scenario_bundle=load_agent_scenario("case33bw_data_center_spike_hard")
+    )
+
+    valid = json.loads(
+        runtime.execute(
+            "validate_action_intent",
+            {
+                "action_intent": {
+                    "type": "adjust_reactive_support",
+                    "from_dc": None,
+                    "to_dc": None,
+                    "battery_id": None,
+                    "generator_id": None,
+                    "target_dc": None,
+                    "dc": None,
+                    "resource_id": "VAR_A",
+                    "target_bus": "DC_A",
+                    "q_mvar": 0.1,
+                    "mw": None,
+                }
+            },
+        )
+    )
+    invalid = json.loads(
+        runtime.execute(
+            "validate_action_intent",
+            {
+                "action_intent": {
+                    "type": "adjust_reactive_support",
+                    "from_dc": None,
+                    "to_dc": None,
+                    "battery_id": None,
+                    "generator_id": None,
+                    "target_dc": None,
+                    "dc": None,
+                    "resource_id": "VAR_A",
+                    "target_bus": "DC_A",
+                    "q_mvar": 0.2,
+                    "mw": None,
+                }
+            },
+        )
+    )
+
+    assert valid["validation"]["valid"] is True
+    assert valid["validation"]["normalized_action_intent"]["resource_id"] == "VAR_A"
+    assert valid["validation"]["normalized_action_intent"]["q_mvar"] == 0.1
+    assert invalid["validation"]["valid"] is False
+    assert "q_mvar <= resource.available_mvar" in invalid["validation"]["failed_checks"][0]
 
 
 def test_tool_runtime_simulates_action_intent_with_pandapower_bundle() -> None:

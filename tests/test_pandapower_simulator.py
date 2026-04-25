@@ -110,6 +110,69 @@ def test_pandapower_simulator_sequence_resolves_hard_spike_cumulatively() -> Non
     assert result["final_state"]["grid_health_score"] > bundle.grid_state.grid_health_score
 
 
+def test_pandapower_simulator_reactive_support_improves_voltage() -> None:
+    bundle = load_agent_scenario("case33bw_data_center_spike_hard")
+    result = simulate_action_sequence_on_pandapower(
+        bundle,
+        [
+            ActionIntent(
+                type="adjust_reactive_support",
+                resource_id="VAR_A",
+                target_bus="DC_A",
+                q_mvar=0.1,
+            )
+        ],
+    )
+
+    voltage_change = next(
+        change for change in result["final_diff"]["voltage_changes"] if change["bus"] == "DC_A"
+    )
+
+    assert result["sequence_completed"] is True
+    assert voltage_change["after_vm_pu"] > voltage_change["before_vm_pu"]
+    assert result["final_state"]["reactive_resources"] == [
+        {"id": "VAR_A", "zone": "feeder_tail", "available_mvar": 0.0}
+    ]
+
+
+def test_pandapower_simulator_reactive_sequence_resolves_hard_spike() -> None:
+    bundle = load_agent_scenario("case33bw_data_center_spike_hard")
+    result = simulate_action_sequence_on_pandapower(
+        bundle,
+        [
+            ActionIntent(
+                type="curtail_flexible_load",
+                dc="DC_A",
+                mw=0.25,
+            ),
+            ActionIntent(
+                type="increase_local_generation",
+                generator_id="GEN_A",
+                target_dc="DC_A",
+                mw=0.25,
+            ),
+            ActionIntent(
+                type="adjust_reactive_support",
+                resource_id="VAR_A",
+                target_bus="DC_A",
+                q_mvar=0.1,
+            ),
+        ],
+    )
+
+    dc_a_voltage = next(
+        voltage for voltage in result["final_state"]["bus_voltages"] if voltage["bus"] == "DC_A"
+    )
+    line_25 = next(
+        line for line in result["final_state"]["line_loadings"] if line["line"] == "line_25"
+    )
+
+    assert result["sequence_completed"] is True
+    assert result["final_diff"]["remaining_violations"] == []
+    assert dc_a_voltage["vm_pu"] >= 0.95
+    assert line_25["loading_percent"] <= 100.0
+
+
 def test_pandapower_simulator_sequence_stops_when_control_is_depleted() -> None:
     bundle = load_agent_scenario("case33bw_data_center_spike_hard")
     result = simulate_action_sequence_on_pandapower(

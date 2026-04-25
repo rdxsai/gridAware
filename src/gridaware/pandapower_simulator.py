@@ -252,6 +252,17 @@ def _apply_intent_to_net(
             )
             generator = _local_generator(local_generators, intent.generator_id)
             generator.available_headroom_mw -= intent.mw
+        case "adjust_reactive_support":
+            target_bus = _target_bus_index(net, data_centers, intent.target_bus)
+            pp.create_sgen(
+                net,
+                bus=target_bus,
+                p_mw=0.0,
+                q_mvar=float(intent.q_mvar),
+                name=str(intent.resource_id),
+            )
+            resource = _reactive_resource(reactive_resources, intent.resource_id)
+            resource.available_mvar -= float(intent.q_mvar)
 
 
 def _adjust_dc_load(net: pp.pandapowerNet, dc: DataCenterSpec, display_delta_mw: float) -> None:
@@ -290,6 +301,28 @@ def _local_generator(
         if generator.id == generator_id:
             return generator
     raise ValueError(f"Unknown local generator: {generator_id}")
+
+
+def _reactive_resource(
+    reactive_resources: list[ReactiveSupportSpec], resource_id: str | None
+) -> ReactiveSupportSpec:
+    for resource in reactive_resources:
+        if resource.resource_id == resource_id:
+            return resource
+    raise ValueError(f"Unknown reactive resource: {resource_id}")
+
+
+def _target_bus_index(
+    net: pp.pandapowerNet,
+    data_centers: list[DataCenterSpec],
+    target_bus: str | None,
+) -> int:
+    for data_center in data_centers:
+        if data_center.data_center_id == target_bus:
+            return data_center.bus
+    if target_bus == "SUBSTATION":
+        return int(net.ext_grid.iloc[0].bus)
+    raise ValueError(f"Unknown target bus: {target_bus}")
 
 
 def _grid_diff(before: GridState, after: GridState) -> dict[str, Any]:

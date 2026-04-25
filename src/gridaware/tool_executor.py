@@ -303,4 +303,19 @@ def _action_feasibility_policy() -> dict[str, Any]:
                 "generator.available_headroom_mw",
             ],
         },
+        "adjust_reactive_support": {
+            "required_fields": ["resource_id", "target_bus", "q_mvar"],
+            "valid_checks": [
+                "resource_id exists in reactive_resources",
+                "target_bus exists in bus_voltages",
+                "q_mvar <= resource.available_mvar",
+                "resource.zone should match target_bus zone or support the target zone",
+            ],
+            "forbidden_checks": [
+                "mw",
+                "target_dc.receiving_headroom_mw",
+                "battery.available_mw",
+                "generator.available_headroom_mw",
+            ],
+        },
     }
