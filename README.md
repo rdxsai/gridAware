@@ -53,7 +53,7 @@ The first variants include CIGRE MV data-center stress cases and a CIGRE LV edge
 
 ## Agents
 
-The first agent is the Analyzer Agent, run by a deterministic orchestrator. See
+The first agents are the Analyzer Agent and Planner Agent, run by a deterministic orchestrator. See
 [docs/agents.md](docs/agents.md).
 
 ## Next Implementation Targets

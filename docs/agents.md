@@ -36,6 +36,42 @@ GridOrchestrator.run_analyzer(...)
   -> validate AnalyzerReport
 ```
 
+## Planner Agent
+
+Purpose: create ranked mitigation action intents for later simulation.
+
+Allowed tools:
+
+- `get_grid_state`
+- `get_available_controls`
+
+Forbidden tools:
+
+- `propose_grid_actions`
+- `simulate_action`
+- `evaluate_action_result`
+- `apply_action`
+- `compare_grid_states`
+
+Output:
+
+- `PlannerReport` from `src/gridaware/agents/models.py`
+- Each candidate includes a structured `action_intent`.
+- Each candidate includes explicit `feasibility_checks` using numbers from grid/control state.
+- `requires_simulation` must be `true`.
+
+Runtime path:
+
+```text
+GridOrchestrator.run_planner(...)
+  -> load_agent_grid(...)
+  -> GridToolRuntime(...)
+  -> run_analyzer_agent(...)
+  -> run_planner_agent(...)
+  -> planner calls get_grid_state and get_available_controls
+  -> validate PlannerReport
+```
+
 ## Deterministic Orchestrator
 
 `GridOrchestrator` is currently deterministic code, not an LLM. It selects the scenario, creates the
@@ -45,4 +81,5 @@ Run manually:
 
 ```bash
 uv run python scripts/run_analyzer.py --scenario mv_data_center_spike
+uv run python scripts/run_planner.py --scenario mv_data_center_spike
 ```
