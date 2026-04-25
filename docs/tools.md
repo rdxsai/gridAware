@@ -105,3 +105,16 @@ Returns original vs active grid summary: health score, violation counts, and app
 The model can choose from backend candidates or author structured action intents. It cannot mutate
 state directly. The backend enforces asset existence, available MW, destination capacity, simulation
 success, and evaluation acceptance before applying any action.
+
+## Scenario Source
+
+Agent grid states come from `load_agent_grid(...)` in `src/gridaware/scenarios.py`. The current
+implementation uses pandapower benchmark networks as base topologies, applies a named scenario
+variant, runs power flow, and converts the result into `GridState`.
+
+Initial variants:
+
+- `mv_data_center_spike`: CIGRE MV benchmark with data center load and a constrained corridor.
+- `mv_renewable_drop`: CIGRE MV benchmark with reduced DER output.
+- `mv_line_constraint`: CIGRE MV benchmark with a tighter line constraint.
+- `lv_edge_data_center`: CIGRE LV benchmark with edge data center stress.

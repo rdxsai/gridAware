@@ -110,7 +110,7 @@ def _apply_action_to_copy(state: GridState, action: Action) -> GridState:
         case "shift_data_center_load":
             _shift_load(predicted, str(action.parameters["from_dc"]), str(action.parameters["to_dc"]), mw)
             _adjust_line(predicted, "line_4", round(-1.62 * mw, 1))
-            _adjust_voltage(predicted, "DC_A", round(0.0027 * mw, 3))
+            _adjust_voltage(predicted, "DC_A", round(0.0032 * mw, 3))
             _adjust_line(predicted, "line_7", round(0.53 * mw, 1))
         case "dispatch_battery":
             _adjust_line(predicted, "line_4", round(-1.5 * mw, 1))

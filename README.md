@@ -46,6 +46,11 @@ uv run pytest
 
 The minimal Responses API tool contract is documented in [docs/tools.md](docs/tools.md).
 
+## Agent Grid Scenarios
+
+Agent-facing grid states are created by `load_agent_grid(...)` from pandapower benchmark networks.
+The first variants include CIGRE MV data-center stress cases and a CIGRE LV edge-load case.
+
 ## Next Implementation Targets
 
 - Replace heuristic simulation with a calibrated `pandapower` network model.
