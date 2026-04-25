@@ -50,6 +50,16 @@ def responses_tool_definitions() -> list[dict[str, Any]]:
         },
         {
             "type": "function",
+            "name": "get_available_controls",
+            "description": (
+                "Return the allowed mitigation action types and controllable grid assets, including "
+                "data center flexibility, receiving headroom, batteries, and local generation."
+            ),
+            "parameters": _empty_parameters(),
+            "strict": True,
+        },
+        {
+            "type": "function",
             "name": "simulate_action",
             "description": (
                 "Validate and simulate a mitigation action without mutating the active grid. "

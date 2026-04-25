@@ -10,6 +10,7 @@ def test_responses_tool_definitions_are_strict() -> None:
     assert [tool["name"] for tool in tools] == [
         "get_grid_state",
         "propose_grid_actions",
+        "get_available_controls",
         "simulate_action",
         "evaluate_action_result",
         "apply_action",
@@ -60,6 +61,17 @@ def test_tool_runtime_rejects_unsimulated_apply() -> None:
     result = json.loads(runtime.execute("apply_action", {"action_id": "A999"}))
 
     assert result == {"ok": False, "error": "Action has not been simulated: A999"}
+
+
+def test_tool_runtime_returns_available_controls() -> None:
+    runtime = GridToolRuntime()
+
+    result = json.loads(runtime.execute("get_available_controls", {}))
+
+    assert result["ok"] is True
+    assert "shift_data_center_load" in result["allowed_action_types"]
+    assert result["data_centers"][0]["receiving_headroom_mw"] == 15.0
+    assert result["batteries"][0]["id"] == "BAT_A"
 
 
 def test_tool_runtime_rejects_infeasible_agent_intent() -> None:

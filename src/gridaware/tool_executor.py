@@ -31,6 +31,8 @@ class GridToolRuntime:
                     payload = self.get_grid_state()
                 case "propose_grid_actions":
                     payload = self.propose_grid_actions(args["target_violation_id"])
+                case "get_available_controls":
+                    payload = self.get_available_controls()
                 case "simulate_action":
                     payload = self.simulate_action(args["action_id"], args["action_intent"])
                 case "evaluate_action_result":
@@ -52,6 +54,33 @@ class GridToolRuntime:
     def propose_grid_actions(self, target_violation_id: str | None) -> dict[str, Any]:
         actions = propose_grid_actions(self.active_state, target_violation_id)
         return {"ok": True, "actions": [action.model_dump(mode="json") for action in actions]}
+
+    def get_available_controls(self) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "allowed_action_types": [
+                "shift_data_center_load",
+                "dispatch_battery",
+                "increase_local_generation",
+                "curtail_flexible_load",
+            ],
+            "data_centers": [
+                {
+                    "id": dc.id,
+                    "zone": dc.zone,
+                    "load_mw": dc.load_mw,
+                    "flexible_mw": dc.flexible_mw,
+                    "max_load_mw": dc.max_load_mw,
+                    "receiving_headroom_mw": round(dc.max_load_mw - dc.load_mw, 3),
+                }
+                for dc in self.active_state.data_centers
+            ],
+            "batteries": [battery.model_dump(mode="json") for battery in self.active_state.batteries],
+            "local_generators": [
+                generator.model_dump(mode="json")
+                for generator in self.active_state.local_generators
+            ],
+        }
 
     def simulate_action(
         self, action_id: str | None, action_intent: dict[str, Any] | None

@@ -62,6 +62,13 @@ Agent-authored intent:
 The backend validates feasibility before simulation. Invalid intents return an error and are not
 stored for execution.
 
+### `get_available_controls`
+
+No parameters.
+
+Returns the allowed mitigation action types and controllable assets. The planner uses this to reason
+about feasibility before proposing structured action intents.
+
 ### `evaluate_action_result`
 
 Parameters:
