@@ -136,6 +136,49 @@ def responses_tool_definitions() -> list[dict[str, Any]]:
         },
         {
             "type": "function",
+            "name": "simulate_candidate_sequences",
+            "description": (
+                "Simulate every planner candidate in one call. Each candidate contains an "
+                "ordered sequence of action_intents. Within a candidate, actions are applied "
+                "cumulatively. Across candidates, each candidate starts from the same original "
+                "stressed grid state so results are comparable."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "candidates": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "candidate_id": {
+                                    "type": "string",
+                                    "description": "Stable candidate identifier.",
+                                },
+                                "rank": {
+                                    "type": "integer",
+                                    "description": "Planner candidate rank.",
+                                },
+                                "action_intents": {
+                                    "type": "array",
+                                    "items": _action_intent_schema(),
+                                    "minItems": 1,
+                                    "description": "Ordered candidate action sequence.",
+                                },
+                            },
+                            "required": ["candidate_id", "rank", "action_intents"],
+                            "additionalProperties": False,
+                        },
+                    }
+                },
+                "required": ["candidates"],
+                "additionalProperties": False,
+            },
+            "strict": True,
+        },
+        {
+            "type": "function",
             "name": "evaluate_action_result",
             "description": (
                 "Evaluate a previously simulated action against deterministic grid safety criteria."

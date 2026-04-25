@@ -145,6 +145,32 @@ def simulate_action_sequence_on_pandapower(
     )
 
 
+def simulate_candidate_sequences_on_pandapower(
+    bundle: ScenarioBundle,
+    candidates: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if not candidates:
+        raise ValueError("simulate_candidate_sequences requires at least one candidate")
+
+    candidate_results = []
+    for index, candidate in enumerate(candidates, start=1):
+        action_intents = candidate.get("action_intents")
+        if not isinstance(action_intents, list):
+            raise ValueError("Each candidate requires action_intents")
+
+        intents = [ActionIntent.model_validate(action_intent) for action_intent in action_intents]
+        result = simulate_action_sequence_on_pandapower(bundle, intents)
+        candidate_results.append(
+            {
+                "candidate_id": str(candidate.get("candidate_id") or f"candidate_{index}"),
+                "rank": int(candidate.get("rank") or index),
+                "result": result,
+            }
+        )
+
+    return {"ok": True, "candidate_results": candidate_results}
+
+
 def _sequence_response(
     *,
     bundle: ScenarioBundle,

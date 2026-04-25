@@ -2,6 +2,7 @@ from gridaware.models import ActionIntent
 from gridaware.pandapower_simulator import (
     simulate_action_intent_on_pandapower,
     simulate_action_sequence_on_pandapower,
+    simulate_candidate_sequences_on_pandapower,
 )
 from gridaware.scenarios import load_agent_scenario
 
@@ -134,3 +135,40 @@ def test_pandapower_simulator_sequence_stops_when_control_is_depleted() -> None:
     assert result["step_results"][0]["validation_passed"] is True
     assert result["step_results"][1]["validation_passed"] is False
     assert "has only 0.0 MW available" in result["step_results"][1]["validation_errors"][0]
+
+
+def test_pandapower_simulator_batches_candidate_sequences_from_same_baseline() -> None:
+    bundle = load_agent_scenario("case33bw_data_center_spike_hard")
+    result = simulate_candidate_sequences_on_pandapower(
+        bundle,
+        [
+            {
+                "candidate_id": "candidate_1",
+                "rank": 1,
+                "action_intents": [
+                    ActionIntent(
+                        type="dispatch_battery",
+                        battery_id="BAT_A",
+                        target_dc="DC_A",
+                        mw=0.25,
+                    ).model_dump(mode="json")
+                ],
+            },
+            {
+                "candidate_id": "candidate_2",
+                "rank": 2,
+                "action_intents": [
+                    ActionIntent(
+                        type="curtail_flexible_load",
+                        dc="DC_A",
+                        mw=0.25,
+                    ).model_dump(mode="json")
+                ],
+            },
+        ],
+    )
+
+    assert result["ok"] is True
+    assert len(result["candidate_results"]) == 2
+    assert result["candidate_results"][0]["result"]["before_state"]["grid_health_score"] == 8
+    assert result["candidate_results"][1]["result"]["before_state"]["grid_health_score"] == 8

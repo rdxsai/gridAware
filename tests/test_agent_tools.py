@@ -15,6 +15,7 @@ def test_responses_tool_definitions_are_strict() -> None:
         "validate_action_intent",
         "simulate_action",
         "simulate_action_sequence",
+        "simulate_candidate_sequences",
         "evaluate_action_result",
         "apply_action",
         "compare_grid_states",
@@ -255,6 +256,62 @@ def test_tool_runtime_simulates_action_sequence_with_pandapower_bundle() -> None
     assert result["final_state"]["scenario_id"] == "case33bw_data_center_spike_hard"
     assert result["final_diff"]["score_change"]["delta"] > 0
     assert result["final_diff"]["remaining_violations"] == []
+
+
+def test_tool_runtime_simulates_candidate_sequences_from_same_baseline() -> None:
+    runtime = GridToolRuntime(
+        scenario_bundle=load_agent_scenario("case33bw_data_center_spike_hard")
+    )
+
+    result = json.loads(
+        runtime.execute(
+            "simulate_candidate_sequences",
+            {
+                "candidates": [
+                    {
+                        "candidate_id": "candidate_1",
+                        "rank": 1,
+                        "action_intents": [
+                            {
+                                "type": "dispatch_battery",
+                                "from_dc": None,
+                                "to_dc": None,
+                                "battery_id": "BAT_A",
+                                "generator_id": None,
+                                "target_dc": "DC_A",
+                                "dc": None,
+                                "mw": 0.25,
+                            }
+                        ],
+                    },
+                    {
+                        "candidate_id": "candidate_2",
+                        "rank": 2,
+                        "action_intents": [
+                            {
+                                "type": "curtail_flexible_load",
+                                "from_dc": None,
+                                "to_dc": None,
+                                "battery_id": None,
+                                "generator_id": None,
+                                "target_dc": None,
+                                "dc": "DC_A",
+                                "mw": 0.25,
+                            }
+                        ],
+                    },
+                ]
+            },
+        )
+    )
+
+    assert result["ok"] is True
+    assert [candidate["candidate_id"] for candidate in result["candidate_results"]] == [
+        "candidate_1",
+        "candidate_2",
+    ]
+    assert result["candidate_results"][0]["result"]["before_state"]["grid_health_score"] == 8
+    assert result["candidate_results"][1]["result"]["before_state"]["grid_health_score"] == 8
 
 
 def test_tool_runtime_rejects_infeasible_agent_intent() -> None:

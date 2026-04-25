@@ -11,6 +11,7 @@ from gridaware.models import ActionIntent, Evaluation, GridState
 from gridaware.pandapower_simulator import (
     simulate_action_intent_on_pandapower,
     simulate_action_sequence_on_pandapower,
+    simulate_candidate_sequences_on_pandapower,
 )
 from gridaware.scenarios import ScenarioBundle, load_demo_scenario
 from gridaware.simulator import (
@@ -60,6 +61,8 @@ class GridToolRuntime:
                     payload = self.simulate_action_intent(args["action_intent"])
                 case "simulate_action_sequence":
                     payload = self.simulate_action_sequence(args["action_intents"])
+                case "simulate_candidate_sequences":
+                    payload = self.simulate_candidate_sequences(args["candidates"])
                 case "evaluate_action_result":
                     payload = self.evaluate_action_result(args["action_id"])
                 case "apply_action":
@@ -147,6 +150,11 @@ class GridToolRuntime:
             self.scenario_bundle,
             [ActionIntent.model_validate(action_intent) for action_intent in action_intents],
         )
+
+    def simulate_candidate_sequences(self, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        if self.scenario_bundle is None:
+            raise ValueError("simulate_candidate_sequences requires a scenario bundle")
+        return simulate_candidate_sequences_on_pandapower(self.scenario_bundle, candidates)
 
     def validate_action_intent(self, action_intent: dict[str, Any]) -> dict[str, Any]:
         validation = validate_action_intent_for_planner(
