@@ -1,0 +1,27 @@
+from __future__ import annotations
+
+import argparse
+import json
+
+from gridaware.orchestrator import GridOrchestrator
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run the gridAware analyzer agent.")
+    parser.add_argument(
+        "--scenario",
+        default="mv_data_center_spike",
+        choices=[
+            "mv_data_center_spike",
+            "mv_renewable_drop",
+            "mv_line_constraint",
+            "lv_edge_data_center",
+        ],
+    )
+    args = parser.parse_args()
+
+    result = GridOrchestrator().run_analyzer(args.scenario)
+    print(json.dumps(result.model_dump(mode="json"), indent=2))
+
+
+if __name__ == "__main__":
+    main()

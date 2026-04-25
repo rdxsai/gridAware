@@ -51,6 +51,11 @@ The minimal Responses API tool contract is documented in [docs/tools.md](docs/to
 Agent-facing grid states are created by `load_agent_grid(...)` from pandapower benchmark networks.
 The first variants include CIGRE MV data-center stress cases and a CIGRE LV edge-load case.
 
+## Agents
+
+The first agent is the Analyzer Agent, run by a deterministic orchestrator. See
+[docs/agents.md](docs/agents.md).
+
 ## Next Implementation Targets
 
 - Replace heuristic simulation with a calibrated `pandapower` network model.
