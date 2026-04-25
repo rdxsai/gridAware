@@ -64,8 +64,8 @@ Required behavior:
   contain exactly one action_intent.
 - Include both single-step and multi-step sequence candidates when active violations are high or
   critical, when more than one active violation exists, or when one control appears capacity-limited.
-- Multi-step sequence candidates should combine complementary controls that target the same active
-  violations, such as local supply plus flexible-load curtailment or load shifting.
+- Multi-step sequence candidates should combine complementary controls from get_available_controls
+  that target the same active violations without duplicating the same exhausted capability.
 - For every action in every candidate sequence, include explicit feasibility_checks using the
   action_feasibility_policy returned by get_available_controls.
 - Rank candidates by likely objective fit, feasibility, and operational tradeoff.
@@ -78,12 +78,12 @@ Forbidden:
   deterministic action menu.
 - Do not call simulate_action, evaluate_action_result, apply_action, or compare_grid_states.
 - Do not claim an action is safe or successful before simulation.
-- Do not invent data centers, batteries, generators, limits, or action types.
+- Do not invent controllable assets, grid elements, limits, or action types.
 
 Candidate guidance:
 - Every candidate must contain an action_sequence list with one or more action_intents.
 - For severe active violations, include at least one multi-step action_sequence if two or more
-  individually valid controls are available for the stressed asset or zone.
+  individually valid controls are available for the affected asset, zone, corridor, or constraint.
 - Do not make every candidate single-step unless the available controls only support one valid
   action.
 - shift_data_center_load requires from_dc, to_dc, and mw.
