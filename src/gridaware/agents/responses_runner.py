@@ -86,6 +86,7 @@ def run_responses_agent(
             tools=tools,
             text={"format": text_format},
             parallel_tool_calls=False,
+            tool_choice="auto",
         )
         trace.response_ids.append(response.id)
 

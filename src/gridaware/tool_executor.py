@@ -80,6 +80,7 @@ class GridToolRuntime:
                 generator.model_dump(mode="json")
                 for generator in self.active_state.local_generators
             ],
+            "action_feasibility_policy": _action_feasibility_policy(),
         }
 
     def simulate_action(
@@ -156,3 +157,56 @@ def _normalize_arguments(arguments: dict[str, Any] | str | None) -> dict[str, An
 
 def _json_error(message: str) -> str:
     return json.dumps({"ok": False, "error": message}, separators=(",", ":"))
+
+
+def _action_feasibility_policy() -> dict[str, Any]:
+    return {
+        "shift_data_center_load": {
+            "required_fields": ["from_dc", "to_dc", "mw"],
+            "valid_checks": [
+                "from_dc exists in data_centers",
+                "to_dc exists in data_centers",
+                "from_dc != to_dc",
+                "mw <= from_dc.flexible_mw",
+                "mw <= to_dc.receiving_headroom_mw",
+            ],
+        },
+        "dispatch_battery": {
+            "required_fields": ["battery_id", "target_dc", "mw"],
+            "valid_checks": [
+                "battery_id exists in batteries",
+                "target_dc exists in data_centers",
+                "mw <= battery.available_mw",
+                "battery.zone should match target_dc.zone or support the target zone",
+            ],
+            "forbidden_checks": [
+                "target_dc.receiving_headroom_mw",
+                "target_dc.flexible_mw",
+            ],
+        },
+        "increase_local_generation": {
+            "required_fields": ["generator_id", "target_dc", "mw"],
+            "valid_checks": [
+                "generator_id exists in local_generators",
+                "target_dc exists in data_centers",
+                "mw <= generator.available_headroom_mw",
+                "generator.zone should match target_dc.zone or support the target zone",
+            ],
+            "forbidden_checks": [
+                "target_dc.receiving_headroom_mw",
+                "target_dc.flexible_mw",
+            ],
+        },
+        "curtail_flexible_load": {
+            "required_fields": ["dc", "mw"],
+            "valid_checks": [
+                "dc exists in data_centers",
+                "mw <= dc.flexible_mw",
+            ],
+            "forbidden_checks": [
+                "receiving_headroom_mw",
+                "battery.available_mw",
+                "generator.available_headroom_mw",
+            ],
+        },
+    }

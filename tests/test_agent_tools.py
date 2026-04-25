@@ -72,6 +72,14 @@ def test_tool_runtime_returns_available_controls() -> None:
     assert "shift_data_center_load" in result["allowed_action_types"]
     assert result["data_centers"][0]["receiving_headroom_mw"] == 15.0
     assert result["batteries"][0]["id"] == "BAT_A"
+    assert (
+        "target_dc.receiving_headroom_mw"
+        in result["action_feasibility_policy"]["dispatch_battery"]["forbidden_checks"]
+    )
+    assert (
+        "mw <= to_dc.receiving_headroom_mw"
+        in result["action_feasibility_policy"]["shift_data_center_load"]["valid_checks"]
+    )
 
 
 def test_tool_runtime_rejects_infeasible_agent_intent() -> None:

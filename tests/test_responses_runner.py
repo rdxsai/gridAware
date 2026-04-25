@@ -15,9 +15,11 @@ from gridaware.tool_executor import GridToolRuntime
 class FakeResponses:
     def __init__(self) -> None:
         self.calls = 0
+        self.kwargs = []
 
     def create(self, **kwargs):
         self.calls += 1
+        self.kwargs.append(kwargs)
         if self.calls == 1:
             return SimpleNamespace(
                 id="resp_1",
@@ -67,8 +69,9 @@ def test_pydantic_schema_is_responses_format_ready() -> None:
 
 
 def test_responses_runner_executes_tool_calls_and_returns_trace() -> None:
+    client = FakeClient()
     result = run_responses_agent(
-        client=FakeClient(),
+        client=client,
         model="test-model",
         system_prompt="Return JSON.",
         user_prompt="Analyze.",
@@ -85,6 +88,7 @@ def test_responses_runner_executes_tool_calls_and_returns_trace() -> None:
     assert report.risk_level == "high"
     assert result.trace.response_ids == ["resp_1", "resp_2"]
     assert result.trace.tool_calls[0].name == "get_grid_state"
+    assert client.responses.kwargs[1]["tool_choice"] == "auto"
 
 
 def test_responses_runner_rejects_disallowed_tool_calls() -> None:

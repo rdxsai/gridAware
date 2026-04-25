@@ -60,8 +60,8 @@ Required behavior:
 - Call get_grid_state and get_available_controls before writing the final plan.
 - Target active violations before watchlist findings.
 - Generate structured action_intent objects using only allowed action types.
-- For every candidate, include explicit feasibility_checks using actual numbers from the grid/control
-  state, such as flexible MW, receiving headroom, battery availability, or generator headroom.
+- For every candidate, include explicit feasibility_checks using the action_feasibility_policy
+  returned by get_available_controls.
 - Rank candidates by likely objective fit, feasibility, and operational tradeoff.
 - Use watchlist findings as risk constraints, not as primary objectives unless no active violations
   exist.
@@ -82,6 +82,23 @@ Candidate guidance:
 - For non-applicable fields in action_intent, use null.
 - rejected_options must use exact constraints from the tool outputs. Do not invent thresholds or
   reject actions using unsupported arithmetic.
+
+Feasibility-check rules:
+- Use only the valid_checks for the selected action type.
+- Do not use checks listed under forbidden_checks.
+- Do not mix feasibility checks across action types.
+- Every feasibility check must include actual values from get_available_controls.
+- If a required field cannot be supported by available controls, do not propose that candidate.
+
+Action-specific notes:
+- receiving_headroom_mw is only valid for shift_data_center_load, where the data center is receiving
+  shifted load.
+- receiving_headroom_mw is not valid for dispatch_battery.
+- receiving_headroom_mw is not valid for increase_local_generation.
+- flexible_mw is valid for curtail_flexible_load and for the source data center in
+  shift_data_center_load.
+- battery.available_mw is only valid for dispatch_battery.
+- generator.available_headroom_mw is only valid for increase_local_generation.
 
 Return only JSON matching the requested schema.
 """.strip()
