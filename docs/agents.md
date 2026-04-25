@@ -21,6 +21,8 @@ Forbidden behavior:
 Output:
 
 - `AnalyzerReport` from `src/gridaware/agents/models.py`
+- `violating_*` fields contain only assets outside limits.
+- `watchlist_*` fields contain near-limit assets that are not currently violating.
 
 Runtime path:
 

@@ -46,7 +46,32 @@ def run_analyzer_agent(
         ),
         initial_tool_choice={"type": "function", "name": "get_grid_state"},
     )
+    report = AnalyzerReport.model_validate_json(result.output_text)
     return AnalyzerRunResult(
-        report=AnalyzerReport.model_validate_json(result.output_text),
+        report=_filter_overbroad_watchlists(report),
         trace=result.trace,
+    )
+
+
+def _filter_overbroad_watchlists(report: AnalyzerReport) -> AnalyzerReport:
+    return report.model_copy(
+        update={
+            "watchlist_lines": [
+                item
+                for item in report.watchlist_lines
+                if item.element_id not in report.violating_lines and 85.0 <= item.observed < item.limit
+            ],
+            "watchlist_buses": [
+                item
+                for item in report.watchlist_buses
+                if item.element_id not in report.violating_buses
+                and (0.95 <= item.observed <= 0.97 or 1.03 <= item.observed <= 1.05)
+            ],
+            "watchlist_data_centers": [
+                item
+                for item in report.watchlist_data_centers
+                if item.element_id not in report.violating_data_centers
+                and (0.95 <= item.observed <= 0.97 or 1.03 <= item.observed <= 1.05)
+            ],
+        }
     )

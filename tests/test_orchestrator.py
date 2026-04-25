@@ -41,9 +41,36 @@ class FakeResponses:
                             "explanation": "line_4 exceeds its thermal limit.",
                         }
                     ],
-                    "stressed_lines": ["line_4"],
-                    "stressed_buses": ["DC_A"],
-                    "stressed_data_centers": ["DC_A"],
+                    "violating_lines": ["line_4"],
+                    "violating_buses": ["DC_A"],
+                    "violating_data_centers": ["DC_A"],
+                    "watchlist_lines": [
+                        {
+                            "element_id": "line_2",
+                            "observed": 90.0,
+                            "limit": 100.0,
+                            "units": "percent",
+                            "reason": "line_2 is near the thermal limit but not violating.",
+                        }
+                    ],
+                    "watchlist_buses": [
+                        {
+                            "element_id": "DC_B",
+                            "observed": 0.989,
+                            "limit": 0.95,
+                            "units": "pu",
+                            "reason": "Overbroad model output that should be filtered.",
+                        }
+                    ],
+                    "watchlist_data_centers": [
+                        {
+                            "element_id": "DC_B",
+                            "observed": 0.989,
+                            "limit": 0.95,
+                            "units": "pu",
+                            "reason": "Overbroad model output that should be filtered.",
+                        }
+                    ],
                     "risk_level": "high",
                     "planner_focus": [
                         "Reduce line_4 loading below 100 percent.",
@@ -71,3 +98,7 @@ def test_orchestrator_runs_analyzer_with_only_grid_state_tool() -> None:
     assert first_call["parallel_tool_calls"] is False
     assert first_call["tool_choice"] == {"type": "function", "name": "get_grid_state"}
     assert result.trace.tool_calls[0].name == "get_grid_state"
+    assert result.report.violating_lines == ["line_4"]
+    assert result.report.watchlist_lines[0].element_id == "line_2"
+    assert result.report.watchlist_buses == []
+    assert result.report.watchlist_data_centers == []

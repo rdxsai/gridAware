@@ -23,15 +23,28 @@ class AnalyzerViolationFinding(BaseModel):
     explanation: str
 
 
+class AnalyzerWatchlistFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    element_id: str
+    observed: float
+    limit: float
+    units: str
+    reason: str
+
+
 class AnalyzerReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scenario_id: str
     summary: str
     active_violations: list[AnalyzerViolationFinding]
-    stressed_lines: list[str]
-    stressed_buses: list[str]
-    stressed_data_centers: list[str]
+    violating_lines: list[str]
+    violating_buses: list[str]
+    violating_data_centers: list[str]
+    watchlist_lines: list[AnalyzerWatchlistFinding]
+    watchlist_buses: list[AnalyzerWatchlistFinding]
+    watchlist_data_centers: list[AnalyzerWatchlistFinding]
     risk_level: RiskLevel
     planner_focus: list[str]
     forbidden_next_steps: list[str]

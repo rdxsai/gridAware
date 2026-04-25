@@ -17,9 +17,20 @@ def test_analyzer_report_schema_requires_structured_fields() -> None:
                     "explanation": "line_4 is above its thermal loading limit.",
                 }
             ],
-            "stressed_lines": ["line_4"],
-            "stressed_buses": ["DC_A"],
-            "stressed_data_centers": ["DC_A"],
+            "violating_lines": ["line_4"],
+            "violating_buses": ["DC_A"],
+            "violating_data_centers": ["DC_A"],
+            "watchlist_lines": [
+                {
+                    "element_id": "line_2",
+                    "observed": 90.0,
+                    "limit": 100.0,
+                    "units": "percent",
+                    "reason": "line_2 is near the thermal loading limit but not violating.",
+                }
+            ],
+            "watchlist_buses": [],
+            "watchlist_data_centers": [],
             "risk_level": "high",
             "planner_focus": ["Reduce line_4 loading below 100 percent."],
             "forbidden_next_steps": ["Do not apply actions without simulation."],
@@ -28,3 +39,5 @@ def test_analyzer_report_schema_requires_structured_fields() -> None:
 
     assert report.scenario_id == "mv_data_center_spike"
     assert report.active_violations[0].severity == "high"
+    assert report.violating_lines == ["line_4"]
+    assert report.watchlist_lines[0].element_id == "line_2"
