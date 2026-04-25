@@ -42,6 +42,10 @@ uv run pytest
 6. Apply the best passing action.
 7. Return a before/after report.
 
+## Agent Tools
+
+The minimal Responses API tool contract is documented in [docs/tools.md](docs/tools.md).
+
 ## Next Implementation Targets
 
 - Replace heuristic simulation with a calibrated `pandapower` network model.
