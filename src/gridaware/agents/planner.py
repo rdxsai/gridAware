@@ -18,7 +18,7 @@ from gridaware.tool_executor import GridToolRuntime
 
 
 def planner_tools() -> list[dict[str, Any]]:
-    allowed_names = {"get_grid_state", "get_available_controls", "validate_action_intent"}
+    allowed_names = {"get_grid_state"}
     return [tool for tool in responses_tool_definitions() if tool["name"] in allowed_names]
 
 
@@ -52,7 +52,8 @@ def run_planner_agent(
 def _planner_user_prompt(analyzer_report: AnalyzerReport) -> str:
     return (
         "Create a mitigation plan from this AnalyzerReport. "
-        "Call get_grid_state and get_available_controls before returning the final JSON.\n\n"
+        "Call get_grid_state before returning the final JSON. "
+        "Do not call get_available_controls; reason freely from the grid state and violations.\n\n"
         f"{json.dumps(analyzer_report.model_dump(mode='json'), indent=2)}"
     )
 

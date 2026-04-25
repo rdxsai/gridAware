@@ -53,12 +53,17 @@ class FakeResponses:
                             "action_sequence": [
                                 {
                                     "type": "curtail_flexible_load",
+                                    "intent_summary": "Curtail flexible load at DC_A.",
                                     "from_dc": None,
                                     "to_dc": None,
                                     "battery_id": None,
                                     "generator_id": None,
                                     "target_dc": None,
                                     "dc": "DC_A",
+                                    "target_element": "DC_A",
+                                    "control_asset": "DC_A",
+                                    "setpoint": None,
+                                    "units": "MW",
                                     "mw": 8.0,
                                 }
                             ],
@@ -104,12 +109,17 @@ def test_simulator_agent_uses_action_sequence_tool() -> None:
                     "action_sequence": [
                         {
                             "type": "curtail_flexible_load",
+                            "intent_summary": "Curtail flexible load at DC_A.",
                             "from_dc": None,
                             "to_dc": None,
                             "battery_id": None,
                             "generator_id": None,
                             "target_dc": None,
                             "dc": "DC_A",
+                            "target_element": "DC_A",
+                            "control_asset": "DC_A",
+                            "setpoint": None,
+                            "units": "MW",
                             "mw": 8.0,
                         }
                     ],

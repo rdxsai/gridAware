@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gridaware.models import ActionType, ViolationType
+from gridaware.models import ViolationType
 
 
 Severity = Literal["low", "medium", "high", "critical"]
@@ -78,14 +78,19 @@ PlannerConfidence = Literal["low", "medium", "high"]
 class PlannerActionIntent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: ActionType
+    type: str
+    intent_summary: str
     from_dc: str | None
     to_dc: str | None
     battery_id: str | None
     generator_id: str | None
     target_dc: str | None
     dc: str | None
-    mw: float
+    target_element: str | None
+    control_asset: str | None
+    setpoint: float | None
+    units: str | None
+    mw: float | None
 
 
 class PlannerCandidate(BaseModel):

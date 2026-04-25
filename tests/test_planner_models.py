@@ -16,12 +16,17 @@ def test_planner_report_schema_requires_ranked_action_sequences() -> None:
                     "action_sequence": [
                         {
                             "type": "shift_data_center_load",
+                            "intent_summary": "Shift flexible data-center load away from DC_A.",
                             "from_dc": "DC_A",
                             "to_dc": "DC_B",
                             "battery_id": None,
                             "generator_id": None,
                             "target_dc": None,
                             "dc": None,
+                            "target_element": "DC_A",
+                            "control_asset": None,
+                            "setpoint": None,
+                            "units": "MW",
                             "mw": 10.0,
                         }
                     ],
