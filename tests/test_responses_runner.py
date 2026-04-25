@@ -1,0 +1,84 @@
+import json
+from types import SimpleNamespace
+
+from gridaware.agents.models import AnalyzerReport
+from gridaware.agents.responses_runner import (
+    json_schema_text_format,
+    pydantic_strict_json_schema,
+    run_responses_agent,
+)
+from gridaware.agent_tools import responses_tool_definitions
+from gridaware.scenarios import load_agent_grid
+from gridaware.tool_executor import GridToolRuntime
+
+
+class FakeResponses:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def create(self, **kwargs):
+        self.calls += 1
+        if self.calls == 1:
+            return SimpleNamespace(
+                id="resp_1",
+                output_text="",
+                output=[
+                    SimpleNamespace(
+                        type="function_call",
+                        name="get_grid_state",
+                        arguments="{}",
+                        call_id="call_1",
+                    )
+                ],
+            )
+        return SimpleNamespace(
+            id="resp_2",
+            output_text=json.dumps(
+                {
+                    "scenario_id": "mv_data_center_spike",
+                    "summary": "High stress from line_4 overload and low voltage at DC_A.",
+                    "active_violations": [],
+                    "stressed_lines": ["line_4"],
+                    "stressed_buses": ["DC_A"],
+                    "stressed_data_centers": ["DC_A"],
+                    "risk_level": "high",
+                    "planner_focus": ["Reduce line_4 loading below 100 percent."],
+                    "forbidden_next_steps": ["Do not apply actions without simulation."],
+                }
+            ),
+            output=[],
+        )
+
+
+class FakeClient:
+    def __init__(self) -> None:
+        self.responses = FakeResponses()
+
+
+def test_pydantic_schema_is_responses_format_ready() -> None:
+    schema = pydantic_strict_json_schema(AnalyzerReport)
+
+    assert "$defs" not in schema
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["active_violations"]["items"]["additionalProperties"] is False
+
+
+def test_responses_runner_executes_tool_calls_and_returns_trace() -> None:
+    result = run_responses_agent(
+        client=FakeClient(),
+        model="test-model",
+        system_prompt="Return JSON.",
+        user_prompt="Analyze.",
+        tools=[tool for tool in responses_tool_definitions() if tool["name"] == "get_grid_state"],
+        runtime=GridToolRuntime(load_agent_grid()),
+        text_format=json_schema_text_format(
+            "analyzer_report",
+            pydantic_strict_json_schema(AnalyzerReport),
+            "Analyzer report.",
+        ),
+    )
+
+    report = AnalyzerReport.model_validate_json(result.output_text)
+    assert report.risk_level == "high"
+    assert result.trace.response_ids == ["resp_1", "resp_2"]
+    assert result.trace.tool_calls[0].name == "get_grid_state"
