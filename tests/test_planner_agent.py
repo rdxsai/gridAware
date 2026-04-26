@@ -41,7 +41,7 @@ def final_response(response_id: str, payload: dict):
     return SimpleNamespace(id=response_id, output_text=json.dumps(payload), output=[])
 
 
-def test_planner_agent_uses_grid_state_only_for_freeform_planning() -> None:
+def test_planner_agent_uses_controls_and_validation_tools() -> None:
     runtime = GridToolRuntime(load_agent_grid())
     analyzer_result = run_analyzer_agent(
         runtime,
@@ -72,8 +72,31 @@ def test_planner_agent_uses_grid_state_only_for_freeform_planning() -> None:
     client = FakeClient(
         [
             function_call_response("planner_1", "get_grid_state", "planner_grid"),
+            function_call_response("planner_2", "get_available_controls", "planner_controls"),
+            function_call_response(
+                "planner_3",
+                "validate_action_intent",
+                "planner_validate",
+                json.dumps(
+                    {
+                        "action_intent": {
+                            "type": "increase_local_generation",
+                            "from_dc": None,
+                            "to_dc": None,
+                            "battery_id": None,
+                            "generator_id": "GEN_A",
+                            "target_dc": "DC_A",
+                            "dc": None,
+                            "resource_id": None,
+                            "target_bus": None,
+                            "q_mvar": None,
+                            "mw": 10.0,
+                        }
+                    }
+                ),
+            ),
             final_response(
-                "planner_2",
+                "planner_4",
                 {
                     "scenario_id": "mv_data_center_spike",
                     "planning_summary": "Reduce DC_A stress with feasible action intents.",
@@ -88,12 +111,12 @@ def test_planner_agent_uses_grid_state_only_for_freeform_planning() -> None:
                                 {
                                     "type": "increase_local_generation",
                                     "intent_summary": "Increase local generation near DC_A.",
-                                    "from_dc": "DC_A",
-                                    "to_dc": "DC_A",
-                                    "battery_id": "BAT_A",
+                                    "from_dc": None,
+                                    "to_dc": None,
+                                    "battery_id": None,
                                     "generator_id": "GEN_A",
                                     "target_dc": "DC_A",
-                                    "dc": "DC_A",
+                                    "dc": None,
                                     "resource_id": None,
                                     "target_bus": None,
                                     "q_mvar": None,
@@ -136,12 +159,16 @@ def test_planner_agent_uses_grid_state_only_for_freeform_planning() -> None:
 
     assert [tool["name"] for tool in planner_tools()] == [
         "get_grid_state",
+        "get_available_controls",
+        "validate_action_intent",
     ]
     assert client.responses.calls[0]["tool_choice"] == {
         "type": "function",
         "name": "get_grid_state",
     }
     assert planner_result.trace.tool_calls[0].name == "get_grid_state"
+    assert planner_result.trace.tool_calls[1].name == "get_available_controls"
+    assert planner_result.trace.tool_calls[2].name == "validate_action_intent"
     intent = planner_result.report.candidates[0].action_sequence[0]
     assert intent.mw == 10.0
     assert intent.type == "increase_local_generation"
