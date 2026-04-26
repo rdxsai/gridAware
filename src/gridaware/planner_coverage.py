@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from gridaware.agents.models import CandidateArchetype, PlannerReport
+from gridaware.agents.models import AgentRunTrace, CandidateArchetype, PlannerReport
 from gridaware.models import GridState
 
 
@@ -36,6 +37,7 @@ def check_planner_coverage(
     report: PlannerReport,
     grid_state: GridState,
     available_controls: dict[str, Any],
+    trace: AgentRunTrace | None = None,
 ) -> PlannerCoverageResult:
     issues: list[PlannerCoverageIssue] = []
     severe = _severe_scenario(grid_state)
@@ -84,11 +86,57 @@ def check_planner_coverage(
             )
         )
 
+    if trace is not None:
+        _check_action_validation_coverage(report, trace, issues)
+
     return PlannerCoverageResult(
         passed=not issues,
         severe_scenario=severe,
         issues=issues,
     )
+
+
+def _check_action_validation_coverage(
+    report: PlannerReport,
+    trace: AgentRunTrace,
+    issues: list[PlannerCoverageIssue],
+) -> None:
+    required = {
+        _planner_intent_signature(intent)
+        for candidate in report.candidates
+        for intent in candidate.action_sequence
+    }
+    validated = _validated_intent_signatures(trace)
+    missing = sorted(required - validated)
+    if missing:
+        issues.append(
+            _issue(
+                "missing_action_validation",
+                (
+                    "Every unique final action_intent must have a matching valid "
+                    f"validate_action_intent tool result; missing signatures: {missing}."
+                ),
+            )
+        )
+
+
+def _validated_intent_signatures(trace: AgentRunTrace) -> set[str]:
+    signatures: set[str] = set()
+    for call in trace.tool_calls:
+        if call.name != "validate_action_intent":
+            continue
+        try:
+            payload = json.loads(call.output)
+        except json.JSONDecodeError:
+            continue
+        validation = payload.get("validation", {})
+        if not validation.get("valid"):
+            continue
+        for key in ("normalized_action_intent", "action_intent"):
+            action_intent = validation.get(key)
+            if isinstance(action_intent, dict):
+                signatures.add(_backend_intent_signature(action_intent))
+    return signatures
 
 
 def _check_max_composite_coverage(
@@ -171,3 +219,45 @@ def _severe_scenario(grid_state: GridState) -> bool:
 
 def _issue(code: str, message: str) -> PlannerCoverageIssue:
     return PlannerCoverageIssue(code=code, message=message)
+
+
+def _planner_intent_signature(intent: Any) -> str:
+    return _backend_intent_signature(
+        {
+            "type": intent.type,
+            "from_dc": intent.from_dc,
+            "to_dc": intent.to_dc,
+            "battery_id": intent.battery_id,
+            "generator_id": intent.generator_id,
+            "target_dc": intent.target_dc,
+            "dc": intent.dc,
+            "resource_id": intent.resource_id,
+            "target_bus": intent.target_bus,
+            "q_mvar": intent.q_mvar,
+            "mw": intent.mw,
+        }
+    )
+
+
+def _backend_intent_signature(intent: dict[str, Any]) -> str:
+    keys = [
+        "type",
+        "from_dc",
+        "to_dc",
+        "battery_id",
+        "generator_id",
+        "target_dc",
+        "dc",
+        "resource_id",
+        "target_bus",
+        "q_mvar",
+        "mw",
+    ]
+    normalized = {key: _normalize_number(intent.get(key)) for key in keys}
+    return json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+
+
+def _normalize_number(value: Any) -> Any:
+    if isinstance(value, float):
+        return round(value, 6)
+    return value

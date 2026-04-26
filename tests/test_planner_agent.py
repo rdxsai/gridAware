@@ -77,27 +77,29 @@ def test_planner_agent_uses_controls_and_validation_tools() -> None:
             function_call_response(
                 "planner_4",
                 "validate_action_intent",
-                "planner_validate",
-                json.dumps(
-                    {
-                        "action_intent": {
-                            "type": "increase_local_generation",
-                            "from_dc": None,
-                            "to_dc": None,
-                            "battery_id": None,
-                            "generator_id": "GEN_A",
-                            "target_dc": "DC_A",
-                            "dc": None,
-                            "resource_id": None,
-                            "target_bus": None,
-                            "q_mvar": None,
-                            "mw": 10.0,
-                        }
-                    }
-                ),
+                "planner_validate_generation",
+                json.dumps({"action_intent": _backend_intent("increase_local_generation", 10.0)}),
+            ),
+            function_call_response(
+                "planner_5",
+                "validate_action_intent",
+                "planner_validate_shift",
+                json.dumps({"action_intent": _backend_intent("shift_data_center_load", 15.0)}),
+            ),
+            function_call_response(
+                "planner_6",
+                "validate_action_intent",
+                "planner_validate_curtail",
+                json.dumps({"action_intent": _backend_intent("curtail_flexible_load", 8.0)}),
+            ),
+            function_call_response(
+                "planner_7",
+                "validate_action_intent",
+                "planner_validate_battery",
+                json.dumps({"action_intent": _backend_intent("dispatch_battery", 10.0)}),
             ),
             final_response(
-                "planner_5",
+                "planner_8",
                 {
                     "scenario_id": "mv_data_center_spike",
                     "planning_summary": "Reduce DC_A stress with feasible action intents.",
@@ -163,6 +165,9 @@ def test_planner_agent_uses_controls_and_validation_tools() -> None:
     assert planner_result.trace.tool_calls[1].name == "get_available_controls"
     assert planner_result.trace.tool_calls[2].name == "build_candidate_archetypes"
     assert planner_result.trace.tool_calls[3].name == "validate_action_intent"
+    assert planner_result.trace.tool_calls[4].name == "validate_action_intent"
+    assert planner_result.trace.tool_calls[5].name == "validate_action_intent"
+    assert planner_result.trace.tool_calls[6].name == "validate_action_intent"
     intent = planner_result.report.candidates[0].action_sequence[0]
     assert intent.mw == 10.0
     assert intent.type == "increase_local_generation"

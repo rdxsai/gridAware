@@ -168,6 +168,15 @@ def test_simulator_agent_uses_action_sequence_tool() -> None:
     assert [tool["name"] for tool in simulator_tools()] == ["simulate_candidate_sequences"]
     assert result.trace.tool_calls[0].name == "simulate_candidate_sequences"
     assert result.report.best_candidate_rank == 1
+    assert result.report.action_results[0].remaining_violations == [
+        "line_overload line_4 at 110.9%",
+        "voltage_low DC_A at 0.921 pu",
+    ]
+    assert result.report.final_grid_state is not None
+    assert result.report.final_grid_state.remaining_violations == [
+        "line_overload line_4 at 110.9%",
+        "voltage_low DC_A at 0.921 pu",
+    ]
 
 
 def test_simulator_translates_conceptual_generation_to_backend_action() -> None:

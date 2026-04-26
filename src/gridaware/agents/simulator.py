@@ -5,9 +5,12 @@ from typing import Any
 
 from gridaware.agent_tools import responses_tool_definitions
 from gridaware.agents.models import (
+    AgentRunTrace,
+    FinalGridStateSummary,
     PlannerActionIntent,
     PlannerCandidate,
     PlannerReport,
+    SimulatedActionResult,
     SimulatorReport,
     SimulatorRunResult,
 )
@@ -55,8 +58,9 @@ def run_simulator_agent(
         initial_tool_choice={"type": "function", "name": "simulate_candidate_sequences"},
         max_tool_rounds=4,
     )
+    report = SimulatorReport.model_validate_json(result.output_text)
     return SimulatorRunResult(
-        report=SimulatorReport.model_validate_json(result.output_text),
+        report=_normalize_simulator_report(report, result.trace),
         trace=result.trace,
     )
 
@@ -254,3 +258,236 @@ def _curtail_mw(
 
 def _candidate_id(candidate: PlannerCandidate) -> str:
     return f"candidate_{candidate.rank}"
+
+
+def _normalize_simulator_report(
+    report: SimulatorReport,
+    trace: AgentRunTrace,
+) -> SimulatorReport:
+    raw_results = _raw_simulation_results(trace)
+    if not raw_results:
+        return report
+
+    raw_by_rank = {item["rank"]: item["result"] for item in raw_results}
+    action_results = [
+        _normalize_action_result(action_result, raw_by_rank.get(action_result.candidate_rank))
+        for action_result in report.action_results
+    ]
+    existing_ranks = {action_result.candidate_rank for action_result in action_results}
+    for raw in raw_results:
+        if raw["rank"] not in existing_ranks:
+            action_results.append(_action_result_from_raw(raw["rank"], raw["result"]))
+
+    best_rank = _best_candidate_rank(raw_results)
+    best_result = next(
+        (item["result"] for item in raw_results if item["rank"] == best_rank),
+        None,
+    )
+    final_state = _final_grid_state(best_result) if best_result else None
+    return report.model_copy(
+        update={
+            "simulation_summary": _simulation_summary(raw_results, best_rank),
+            "action_results": sorted(action_results, key=lambda item: item.candidate_rank),
+            "best_candidate_rank": best_rank,
+            "final_grid_status": _final_grid_status(final_state),
+            "final_grid_state": final_state,
+        }
+    )
+
+
+def _raw_simulation_results(trace: AgentRunTrace) -> list[dict[str, Any]]:
+    for call in trace.tool_calls:
+        if call.name != "simulate_candidate_sequences":
+            continue
+        try:
+            payload = json.loads(call.output)
+        except json.JSONDecodeError:
+            return []
+        results = payload.get("candidate_results", [])
+        return results if isinstance(results, list) else []
+    return []
+
+
+def _normalize_action_result(
+    action_result: SimulatedActionResult,
+    raw_result: dict[str, Any] | None,
+) -> SimulatedActionResult:
+    if raw_result is None:
+        return action_result
+    raw_action_result = _action_result_from_raw(action_result.candidate_rank, raw_result)
+    return action_result.model_copy(
+        update={
+            "sequence_completed": raw_action_result.sequence_completed,
+            "failed_step_index": raw_action_result.failed_step_index,
+            "power_flow_converged": raw_action_result.power_flow_converged,
+            "successful_changes": raw_action_result.successful_changes,
+            "failed_changes": raw_action_result.failed_changes,
+            "grid_changes_summary": raw_action_result.grid_changes_summary,
+            "remaining_violations": raw_action_result.remaining_violations,
+            "final_grid_health_score": raw_action_result.final_grid_health_score,
+        }
+    )
+
+
+def _action_result_from_raw(rank: int, raw_result: dict[str, Any]) -> SimulatedActionResult:
+    final_state = raw_result.get("final_state") or {}
+    final_diff = raw_result.get("final_diff") or {}
+    remaining = _violation_labels(final_state.get("violations", []))
+    return SimulatedActionResult(
+        candidate_rank=rank,
+        action_sequence=[
+            PlannerActionIntent(
+                intent_summary=f"Simulated {intent['type']}.",
+                target_element=None,
+                control_asset=None,
+                setpoint=None,
+                units=None,
+                **intent,
+            )
+            for intent in raw_result.get("action_intents", [])
+        ],
+        sequence_completed=bool(raw_result.get("sequence_completed")),
+        failed_step_index=raw_result.get("failed_step_index"),
+        power_flow_converged=_power_flow_converged(raw_result),
+        successful_changes=_successful_changes(final_diff, final_state),
+        failed_changes=_failed_changes(remaining, raw_result),
+        grid_changes_summary=_grid_changes_summary(rank, final_state, remaining),
+        remaining_violations=remaining,
+        final_grid_health_score=final_state.get("grid_health_score"),
+    )
+
+
+def _best_candidate_rank(raw_results: list[dict[str, Any]]) -> int | None:
+    if not raw_results:
+        return None
+
+    def score(item: dict[str, Any]) -> tuple[int, int, float]:
+        result = item["result"]
+        final_state = result.get("final_state") or {}
+        remaining_count = len(final_state.get("violations", []))
+        completed = 1 if result.get("sequence_completed") else 0
+        health = float(final_state.get("grid_health_score") or 0)
+        return (completed, -remaining_count, health)
+
+    return max(raw_results, key=score)["rank"]
+
+
+def _final_grid_state(raw_result: dict[str, Any] | None) -> FinalGridStateSummary | None:
+    if raw_result is None:
+        return None
+    final_state = raw_result.get("final_state")
+    if not final_state:
+        return None
+    return FinalGridStateSummary(
+        scenario_id=final_state["scenario_id"],
+        grid_health_score=final_state["grid_health_score"],
+        remaining_violations=_violation_labels(final_state.get("violations", [])),
+        max_line_loading_percent=max(
+            (line["loading_percent"] for line in final_state.get("line_loadings", [])),
+            default=0.0,
+        ),
+        min_bus_voltage_pu=min(
+            (bus["vm_pu"] for bus in final_state.get("bus_voltages", [])),
+            default=1.0,
+        ),
+    )
+
+
+def _simulation_summary(raw_results: list[dict[str, Any]], best_rank: int | None) -> str:
+    completed = sum(1 for item in raw_results if item["result"].get("sequence_completed"))
+    cleared = sum(
+        1
+        for item in raw_results
+        if item["result"].get("final_state")
+        and not item["result"]["final_state"].get("violations", [])
+    )
+    return (
+        f"Simulated {len(raw_results)} candidates from the same baseline; {completed} completed "
+        f"and {cleared} cleared all violations. Best candidate rank: {best_rank}."
+    )
+
+
+def _final_grid_status(final_state: FinalGridStateSummary | None) -> str:
+    if final_state is None:
+        return "No completed simulation result was available."
+    if final_state.remaining_violations:
+        return (
+            "Improved or evaluated, but remaining violations persist: "
+            f"{', '.join(final_state.remaining_violations)}."
+        )
+    return "Healthy after mitigation; selected candidate has no remaining violations."
+
+
+def _successful_changes(final_diff: dict[str, Any], final_state: dict[str, Any]) -> list[str]:
+    changes: list[str] = []
+    score_change = final_diff.get("score_change", {})
+    if score_change:
+        changes.append(
+            "Grid health score changed from "
+            f"{score_change.get('before')} to {score_change.get('after')}."
+        )
+    resolved = _violation_labels(final_diff.get("resolved_violations", []))
+    if resolved:
+        changes.append(f"Resolved violations: {', '.join(resolved)}.")
+    if final_state:
+        max_line = max(
+            (line["loading_percent"] for line in final_state.get("line_loadings", [])),
+            default=0.0,
+        )
+        min_voltage = min(
+            (bus["vm_pu"] for bus in final_state.get("bus_voltages", [])),
+            default=1.0,
+        )
+        changes.append(f"Final max line loading is {max_line:g}%.")
+        changes.append(f"Final minimum bus voltage is {min_voltage:g} pu.")
+    return changes
+
+
+def _failed_changes(remaining: list[str], raw_result: dict[str, Any]) -> list[str]:
+    failures: list[str] = []
+    if not raw_result.get("sequence_completed"):
+        failures.append(raw_result.get("error") or "Sequence did not complete.")
+    if remaining:
+        failures.append(f"Remaining violations: {', '.join(remaining)}.")
+    return failures
+
+
+def _grid_changes_summary(
+    rank: int,
+    final_state: dict[str, Any],
+    remaining: list[str],
+) -> str:
+    if not final_state:
+        return f"Candidate {rank} did not produce a final grid state."
+    if remaining:
+        return f"Candidate {rank} completed with remaining violations: {', '.join(remaining)}."
+    return f"Candidate {rank} completed with no remaining violations."
+
+
+def _power_flow_converged(raw_result: dict[str, Any]) -> bool:
+    steps = raw_result.get("step_results", [])
+    return bool(steps) and all(step.get("power_flow_converged") for step in steps)
+
+
+def _violation_labels(violations: list[dict[str, Any]]) -> list[str]:
+    labels = []
+    for violation in violations:
+        violation_type = violation.get("type", "violation")
+        element_id = violation.get("element_id", "unknown")
+        if "observed" in violation:
+            labels.append(
+                f"{violation_type} {element_id} at "
+                f"{violation['observed']:g}{_unit_suffix(violation)}"
+            )
+        else:
+            labels.append(f"{violation_type} {element_id}")
+    return labels
+
+
+def _unit_suffix(violation: dict[str, Any]) -> str:
+    units = violation.get("units")
+    if units == "percent":
+        return "%"
+    if units:
+        return f" {units}"
+    return ""

@@ -49,7 +49,7 @@ def run_planner_agent(
     )
     report = _normalize_planner_report(PlannerReport.model_validate_json(result.output_text))
     coverage = check_planner_coverage(
-        report, runtime.active_state, runtime.get_available_controls()
+        report, runtime.active_state, runtime.get_available_controls(), result.trace
     )
     if coverage.passed:
         return PlannerRunResult(report=report, trace=result.trace)
@@ -64,7 +64,10 @@ def run_planner_agent(
         PlannerReport.model_validate_json(repair_result.output_text)
     )
     repaired_coverage = check_planner_coverage(
-        repaired_report, runtime.active_state, runtime.get_available_controls()
+        repaired_report,
+        runtime.active_state,
+        runtime.get_available_controls(),
+        repair_result.trace,
     )
     trace = _merge_traces(result.trace, repair_result.trace)
     if not repaired_coverage.passed:
