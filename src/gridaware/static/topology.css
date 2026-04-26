@@ -118,17 +118,11 @@ button {
   border: 1px solid rgba(114, 148, 183, 0.09);
 }
 
-svg {
-  width: 100%;
-  height: calc(100vh - 105px);
-  min-height: 720px;
-}
-
 .summary-card {
   position: absolute;
   top: 22px;
   left: 24px;
-  z-index: 2;
+  z-index: 5;
   padding: 12px 16px;
   border-radius: 14px;
   background: rgba(4, 13, 24, 0.62);
@@ -146,94 +140,131 @@ svg {
   color: var(--text);
 }
 
-.backbone-edge,
-.edge {
-  stroke: rgba(141, 196, 255, 0.9);
-  stroke-width: 4;
-  fill: none;
-  filter: url(#line-glow);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
+.topology-stage {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1000px;
+  height: 860px;
+  transform-origin: top center;
 }
 
-.backbone-edge {
-  display: none;
+.edge-layer,
+.node-layer,
+.label-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.edge-layer {
+  z-index: 1;
+}
+
+.node-layer {
+  z-index: 2;
+}
+
+.label-layer {
+  z-index: 3;
   pointer-events: none;
-  opacity: 0.9;
 }
 
-.edge {
+.edge-segment {
+  position: absolute;
+  height: 5px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(141, 196, 255, 0.95);
+  box-shadow:
+    0 0 8px rgba(125, 185, 255, 0.95),
+    0 0 18px rgba(125, 185, 255, 0.28);
   cursor: pointer;
-  opacity: 0.95;
+  transform-origin: left center;
+  line-height: 0;
 }
 
-.edge.overloaded {
-  stroke: var(--red);
-  stroke-width: 5;
-  filter: url(#red-glow);
+.edge-segment::after {
+  content: "";
+  position: absolute;
+  inset: -8px 0;
 }
 
-.backbone-edge.overloaded {
-  stroke: var(--red);
-  stroke-width: 5;
-  filter: url(#red-glow);
+.edge-segment.overloaded {
+  height: 7px;
+  background: var(--red);
+  box-shadow:
+    0 0 10px rgba(255, 97, 95, 0.98),
+    0 0 22px rgba(255, 97, 95, 0.5);
 }
 
-.node-core {
-  fill: #c9d4e2;
-  stroke: rgba(223, 237, 255, 0.8);
-  stroke-width: 1.4;
+.node {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  transform: translate(-50%, -50%);
   cursor: pointer;
 }
 
-.asset-ring {
-  fill: rgba(12, 28, 48, 0.94);
-  stroke-width: 3;
-  cursor: pointer;
+.bus-node {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #c9d4e2;
+  box-shadow: 0 0 0 1px rgba(223, 237, 255, 0.8);
 }
 
-.asset-ring.data-center {
-  stroke: #3488f4;
-}
-
-.asset-ring.battery {
-  stroke: var(--purple);
-}
-
-.asset-ring.generator,
-.asset-ring.slack {
-  stroke: #6fcc6f;
-}
-
-.asset-ring.reactive_support {
-  stroke: var(--yellow);
-}
-
-.asset-icon,
-.asset-text {
-  pointer-events: none;
-  font-weight: 800;
-  text-anchor: middle;
-  dominant-baseline: middle;
-}
-
-.asset-icon {
-  font-size: 31px;
-}
-
-.asset-text {
+.asset-node {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
+  color: #030913;
   font-size: 27px;
+  font-weight: 900;
+  background: rgba(12, 28, 48, 0.94);
+}
+
+.asset-node.data_center {
+  width: 84px;
+  height: 84px;
+  color: #2f7ee6;
+  border: 3px solid #3488f4;
+  background: radial-gradient(circle, rgba(30, 73, 126, 0.98), rgba(12, 28, 48, 0.96));
+}
+
+.asset-node.battery {
+  border: 3px solid var(--purple);
+}
+
+.asset-node.generator,
+.asset-node.slack {
+  border: 3px solid #6fcc6f;
+}
+
+.asset-node.reactive_support {
+  border: 3px solid var(--yellow);
+}
+
+.label,
+.sublabel,
+.metric,
+.line-label,
+.line-value {
+  position: absolute;
+  white-space: nowrap;
 }
 
 .label {
-  fill: var(--text);
+  color: var(--text);
   font-size: 18px;
   font-weight: 700;
 }
 
 .sublabel {
-  fill: var(--muted);
+  color: var(--muted);
   font-size: 16px;
   font-weight: 500;
 }
@@ -244,31 +275,31 @@ svg {
 }
 
 .metric.good {
-  fill: var(--green);
+  color: var(--green);
 }
 
 .metric.bad {
-  fill: var(--red);
+  color: var(--red);
 }
 
 .line-label {
-  fill: var(--muted);
+  color: var(--muted);
   font-size: 17px;
-  text-anchor: middle;
+  transform: translateX(-50%);
 }
 
 .line-value {
-  fill: var(--red);
+  color: var(--red);
   font-size: 24px;
   font-weight: 900;
-  text-anchor: middle;
+  transform: translateX(-50%);
 }
 
 .details-panel {
   position: absolute;
   top: 330px;
   left: 50%;
-  z-index: 3;
+  z-index: 6;
   width: 315px;
   transform: translateX(-10%);
   border-radius: 18px;
@@ -362,7 +393,7 @@ svg {
     width: 100%;
   }
 
-  svg {
-    min-width: 900px;
+  .canvas-card {
+    min-height: 720px;
   }
 }

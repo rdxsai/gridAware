@@ -1,13 +1,17 @@
+const CANVAS_WIDTH = 1000;
+const CANVAS_HEIGHT = 860;
+
 const state = {
   topology: null,
   mode: "line",
   selected: null,
 };
 
-const svg = document.querySelector("#topology");
-const edgeLayer = document.querySelector("#edges");
-const nodeLayer = document.querySelector("#nodes");
-const labelLayer = document.querySelector("#labels");
+const canvasCard = document.querySelector(".canvas-card");
+const stage = document.querySelector("#topology-stage");
+const edgeLayer = document.querySelector("#edge-layer");
+const nodeLayer = document.querySelector("#node-layer");
+const labelLayer = document.querySelector("#label-layer");
 const detailsPanel = document.querySelector("#details-panel");
 const scenarioLabel = document.querySelector("#scenario-label");
 const gridHealth = document.querySelector("#grid-health");
@@ -29,99 +33,104 @@ function render() {
   nodeLayer.replaceChildren();
   labelLayer.replaceChildren();
 
-  for (const edge of topology.edges) {
-    renderEdge(edge);
-  }
-  svg.dataset.edgeCount = edgeLayer.querySelectorAll(".edge").length;
+  for (const edge of topology.edges) renderEdge(edge);
+  stage.dataset.edgeCount = edgeLayer.querySelectorAll(".edge-segment").length;
+
   for (const node of topology.nodes) {
     renderNode(node);
     renderNodeLabel(node);
   }
+
+  fitStage();
 }
 
 function renderEdge(edge) {
   const route = edge.details.route;
   if (!route || route.length < 2) return;
-  const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  polyline.setAttribute("points", route.map((point) => `${point.x},${point.y}`).join(" "));
-  polyline.classList.add("edge");
-  if (edge.status === "overloaded") polyline.classList.add("overloaded");
-  polyline.dataset.id = edge.id;
-  polyline.addEventListener("click", (event) => {
-    event.stopPropagation();
-    selectItem("edge", edge);
+
+  route.slice(0, -1).forEach((point, index) => {
+    const next = route[index + 1];
+    const segment = document.createElement("button");
+    segment.type = "button";
+    segment.classList.add("edge-segment");
+    if (edge.status === "overloaded") segment.classList.add("overloaded");
+    segment.dataset.id = edge.id;
+    segment.setAttribute("aria-label", edge.label);
+    placeSegment(segment, point, next);
+    segment.addEventListener("click", (event) => {
+      event.stopPropagation();
+      selectItem("edge", edge);
+    });
+    edgeLayer.appendChild(segment);
   });
-  edgeLayer.appendChild(polyline);
 
   if (edge.id === "line_25") {
     const midX = (route[0].x + route.at(-1).x) / 2;
     const midY = (route[0].y + route.at(-1).y) / 2;
-    labelLayer.appendChild(text(midX, midY + 42, "line_25", "line-label"));
-    labelLayer.appendChild(text(midX, midY + 72, `${edge.loading_percent}%`, "line-value"));
+    labelLayer.appendChild(label(midX, midY + 42, "line_25", "line-label"));
+    labelLayer.appendChild(label(midX, midY + 72, `${edge.loading_percent}%`, "line-value"));
   }
 }
 
-function renderNode(node) {
-  if (node.kind === "bus") {
-    const circle = circleNode(node.x, node.y, 9, "node-core");
-    circle.addEventListener("click", (event) => {
-      event.stopPropagation();
-      selectItem("node", node);
-    });
-    nodeLayer.appendChild(circle);
-    return;
-  }
+function placeSegment(segment, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+  Object.assign(segment.style, {
+    left: `${start.x}px`,
+    top: `${start.y}px`,
+    width: `${length}px`,
+    transform: `translateY(-50%) rotate(${angle}deg)`,
+  });
+}
 
-  const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  group.classList.add("asset");
-  group.dataset.id = node.id;
-  group.addEventListener("click", (event) => {
+function renderNode(node) {
+  const item = document.createElement("button");
+  item.type = "button";
+  item.classList.add("node", node.kind);
+  item.dataset.id = node.id;
+  item.setAttribute("aria-label", node.label);
+  item.style.left = `${node.x}px`;
+  item.style.top = `${node.y}px`;
+  item.addEventListener("click", (event) => {
     event.stopPropagation();
     selectItem("node", node);
   });
 
-  const ring = circleNode(node.x, node.y, node.kind === "data_center" ? 42 : 34, "asset-ring");
-  ring.classList.add(node.kind);
-  group.appendChild(ring);
-
-  if (node.kind === "data_center") {
-    group.appendChild(text(node.x, node.y + 2, "▦", "asset-icon"));
-  } else if (node.kind === "battery") {
-    group.appendChild(text(node.x, node.y, "▣", "asset-icon"));
-  } else if (node.kind === "generator") {
-    group.appendChild(text(node.x, node.y, "G", "asset-text"));
-  } else if (node.kind === "reactive_support") {
-    group.appendChild(text(node.x, node.y, "ϕ", "asset-text"));
-  } else if (node.kind === "slack") {
-    group.appendChild(text(node.x, node.y, "~", "asset-text"));
+  if (node.kind === "bus") {
+    item.classList.add("bus-node");
+  } else {
+    item.classList.add("asset-node");
+    item.textContent = nodeIcon(node);
   }
 
-  nodeLayer.appendChild(group);
+  nodeLayer.appendChild(item);
 }
 
 function renderNodeLabel(node) {
   if (node.kind === "bus") {
-    labelLayer.appendChild(text(node.x - 18, node.y - 28, node.label, "label"));
+    labelLayer.appendChild(label(node.x - 18, node.y - 28, node.label, "label"));
     return;
   }
 
   if (node.id === "bus_1") {
-    labelLayer.appendChild(text(node.x - 24, node.y - 62, "SLACK", "label"));
-    labelLayer.appendChild(text(node.x - 22, node.y - 35, "Bus 1", "label"));
+    labelLayer.appendChild(label(node.x - 24, node.y - 62, "SLACK", "label"));
+    labelLayer.appendChild(label(node.x - 22, node.y - 35, "Bus 1", "label"));
     return;
   }
 
   const labelX = node.kind === "data_center" ? node.x - 45 : node.x + 46;
   const labelY = node.kind === "data_center" ? node.y - 50 : node.y - 25;
-  labelLayer.appendChild(text(labelX, labelY, node.label, "label"));
-  labelLayer.appendChild(text(labelX, labelY + 28, node.bus, "sublabel"));
+  labelLayer.appendChild(label(labelX, labelY, node.label, "label"));
+  labelLayer.appendChild(label(labelX, labelY + 28, node.bus, "sublabel"));
 
   if (node.kind === "data_center") {
-    labelLayer.appendChild(text(labelX + 16, labelY + 70, "Load", "sublabel"));
-    labelLayer.appendChild(text(labelX - 4, labelY + 100, `${fmt(node.details.load_mw)} MW`, "sublabel"));
-    labelLayer.appendChild(text(labelX + 14, labelY + 142, "Voltage", "sublabel"));
+    labelLayer.appendChild(label(labelX + 16, labelY + 70, "Load", "sublabel"));
+    labelLayer.appendChild(label(labelX - 4, labelY + 100, `${fmt(node.details.load_mw)} MW`, "sublabel"));
+    labelLayer.appendChild(label(labelX + 14, labelY + 142, "Voltage", "sublabel"));
     labelLayer.appendChild(
-      text(
+      label(
         labelX - 2,
         labelY + 172,
         `${fmt(node.details.voltage_pu)} pu`,
@@ -131,19 +140,37 @@ function renderNodeLabel(node) {
   }
 
   if (node.kind === "battery") {
-    labelLayer.appendChild(text(labelX - 15, labelY + 64, "Available", "sublabel"));
-    labelLayer.appendChild(text(labelX - 15, labelY + 92, `${fmt(node.details.available_mw)} MW`, "sublabel"));
+    labelLayer.appendChild(label(labelX - 15, labelY + 64, "Available", "sublabel"));
+    labelLayer.appendChild(label(labelX - 15, labelY + 92, `${fmt(node.details.available_mw)} MW`, "sublabel"));
   }
 
   if (node.kind === "generator") {
-    labelLayer.appendChild(text(labelX, labelY + 64, "Headroom", "sublabel"));
-    labelLayer.appendChild(text(labelX, labelY + 92, `${fmt(node.details.headroom_mw)} MW`, "sublabel"));
+    labelLayer.appendChild(label(labelX, labelY + 64, "Headroom", "sublabel"));
+    labelLayer.appendChild(label(labelX, labelY + 92, `${fmt(node.details.headroom_mw)} MW`, "sublabel"));
   }
 
   if (node.kind === "reactive_support") {
-    labelLayer.appendChild(text(labelX, labelY + 64, "Available", "sublabel"));
-    labelLayer.appendChild(text(labelX, labelY + 92, `${fmt(node.details.available_mvar)} MVAr`, "sublabel"));
+    labelLayer.appendChild(label(labelX, labelY + 64, "Available", "sublabel"));
+    labelLayer.appendChild(label(labelX, labelY + 92, `${fmt(node.details.available_mvar)} MVAr`, "sublabel"));
   }
+}
+
+function nodeIcon(node) {
+  if (node.kind === "data_center") return "▦";
+  if (node.kind === "battery") return "▣";
+  if (node.kind === "generator") return "G";
+  if (node.kind === "reactive_support") return "ϕ";
+  if (node.kind === "slack") return "~";
+  return "";
+}
+
+function label(x, y, content, className) {
+  const item = document.createElement("div");
+  item.className = className;
+  item.style.left = `${x}px`;
+  item.style.top = `${y}px`;
+  item.textContent = content;
+  return item;
 }
 
 function selectItem(type, item) {
@@ -211,22 +238,9 @@ function nodeRows(node) {
   return [...base, ...Object.entries(details).map(([key, value]) => [title(key), value])];
 }
 
-function circleNode(x, y, radius, className) {
-  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  circle.setAttribute("cx", x);
-  circle.setAttribute("cy", y);
-  circle.setAttribute("r", radius);
-  circle.setAttribute("class", className);
-  return circle;
-}
-
-function text(x, y, content, className) {
-  const node = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  node.setAttribute("x", x);
-  node.setAttribute("y", y);
-  node.setAttribute("class", className);
-  node.textContent = content;
-  return node;
+function fitStage() {
+  const scale = Math.min(canvasCard.clientWidth / CANVAS_WIDTH, canvasCard.clientHeight / CANVAS_HEIGHT);
+  stage.style.transform = `translateX(-50%) scale(${scale})`;
 }
 
 function fmt(value) {
@@ -246,7 +260,8 @@ document.querySelectorAll(".mode-button").forEach((button) => {
   });
 });
 
-svg.addEventListener("click", () => detailsPanel.classList.add("hidden"));
+canvasCard.addEventListener("click", () => detailsPanel.classList.add("hidden"));
+window.addEventListener("resize", fitStage);
 loadTopology().catch((error) => {
   scenarioLabel.textContent = "Topology unavailable";
   gridHealth.textContent = error.message;
