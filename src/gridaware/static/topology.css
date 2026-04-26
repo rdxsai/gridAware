@@ -158,19 +158,20 @@ svg {
 }
 
 .backbone-edge {
+  display: none;
   pointer-events: none;
   opacity: 0.9;
 }
 
 .edge {
   cursor: pointer;
-  opacity: 0;
-  stroke-width: 14;
-  filter: none;
+  opacity: 0.95;
 }
 
 .edge.overloaded {
-  stroke: transparent;
+  stroke: var(--red);
+  stroke-width: 5;
+  filter: url(#red-glow);
 }
 
 .backbone-edge.overloaded {

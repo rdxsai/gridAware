@@ -44,6 +44,7 @@ def test_topology_api_and_static_app_are_served() -> None:
     topology_response = client.get("/grid/topology/current")
     app_response = client.get("/app")
     root_response = client.get("/")
+    css_response = client.get("/static/topology.css")
 
     assert topology_response.status_code == 200
     assert topology_response.json()["scenario_id"] == "case33bw_data_center_spike_tricky"
@@ -52,6 +53,9 @@ def test_topology_api_and_static_app_are_served() -> None:
     assert "feeder-backbone" in app_response.text
     assert 'x1="70" y1="160" x2="290" y2="160"' in app_response.text
     assert 'x1="290" y1="160" x2="490" y2="160"' in app_response.text
-    assert "topology.js?v=20260426-r3" in app_response.text
+    assert "topology.js?v=20260426-r4" in app_response.text
     assert root_response.status_code == 200
     assert "gridAware Topology" in root_response.text
+    assert css_response.status_code == 200
+    assert ".edge.overloaded" in css_response.text
+    assert "stroke: var(--red)" in css_response.text
