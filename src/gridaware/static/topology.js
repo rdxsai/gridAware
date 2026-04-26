@@ -29,25 +29,19 @@ function render() {
   nodeLayer.replaceChildren();
   labelLayer.replaceChildren();
 
-  const nodesById = new Map(topology.nodes.map((node) => [node.id, node]));
   for (const edge of topology.edges) {
-    renderEdge(edge, nodesById);
+    renderEdge(edge);
   }
+  svg.dataset.edgeCount = edgeLayer.querySelectorAll(".edge").length;
   for (const node of topology.nodes) {
     renderNode(node);
     renderNodeLabel(node);
   }
 }
 
-function renderEdge(edge, nodesById) {
-  const from = nodesById.get(edge.from_node);
-  const to = nodesById.get(edge.to_node);
-  if (!from || !to) return;
-
-  const route = edge.details.route || [
-    { x: from.x, y: from.y },
-    { x: to.x, y: to.y },
-  ];
+function renderEdge(edge) {
+  const route = edge.details.route;
+  if (!route || route.length < 2) return;
   const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
   polyline.setAttribute("points", route.map((point) => `${point.x},${point.y}`).join(" "));
   polyline.classList.add("edge");
