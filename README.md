@@ -5,6 +5,46 @@ demand spikes. Three agents — **analyzer**, **planner**, and **executor** — 
 synthetic distribution feeder built on the IEEE 33-bus benchmark, with a real
 `pandapower` power-flow solver under the hood.
 
+## Team
+
+| | |
+|---|---|
+| **Team name** | Royal Challengers |
+| **Track** | Electric grid |
+| **Members** | Rudra Desai |
+
+## What was built
+
+A working three-agent pipeline behind a single-page topology UI:
+
+- **Analyzer agent** (LLM, OpenAI Responses API) reads the live grid state and emits a
+  structured report of violations with severity and plain-English explanations.
+- **Planner agent** (LLM, OpenAI Responses API) takes the analyzer report and proposes
+  five mitigation levers (load shifting, curtailment, battery dispatch, local generation,
+  reactive support), each pre-validated against the grid's available controls.
+- **Executor** (deterministic) applies the deduplicated planner action set to a
+  deep-copied `pandapower` network, re-runs power flow, and reports before/after metrics
+  per-action.
+- A FastAPI backend orchestrates the three agents as background jobs and serves a
+  pre/post-action topology view to the UI.
+- A vanilla-JS instrument-style frontend (no React, no build step) walks the operator
+  through analyze → plan → execute, with the topology canvas recoloring red/amber/green
+  in sync with each phase and per-element flash on cross-link clicks.
+
+## Datasets & APIs
+
+| Source | What it provides |
+|---|---|
+| **IEEE 33-bus benchmark feeder** (via `pandapower.networks.case33bw()`) | Standard 12.66 kV medium-voltage radial distribution feeder used as the topology baseline. Augmented with synthetic data-center loads, batteries, generators, and reactive-support resources to build the `case33bw_data_center_spike_tricky` scenario. |
+| **`pandapower`** (open-source power-system simulator) | Newton-Raphson load flow for both the agents' analytical view and the deterministic executor. |
+| **OpenAI Responses API** | Hosts the analyzer and planner agents (LLM tool-calling against our deterministic grid-tool runtime). |
+| **FastAPI** | HTTP surface — agent job endpoints, topology views, static asset serving. |
+| **Lucide-style inline SVG icons** | Custom hand-tuned SVGs for data-center, battery, generator, reactive, and source nodes. No external icon-pack runtime dependency. |
+
+No external data feeds, no third-party datasets beyond the benchmark feeder. The
+violation scenario, the data-center sizing (~1 MW), and the available controls are all
+synthesized in `src/gridaware/scenarios.py`.
+
 ## What you'll see
 
 A single-page topology UI showing a 12.66 kV distribution feeder serving an edge data
