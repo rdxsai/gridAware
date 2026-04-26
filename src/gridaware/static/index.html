@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>gridAware Topology</title>
+    <link rel="stylesheet" href="/static/topology.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="toolbar" aria-label="Topology controls">
+        <button class="select-button">Layout: <strong>Radial</strong><span>⌄</span></button>
+        <button class="icon-button" aria-label="Zoom out">⌕</button>
+        <button class="icon-button" aria-label="Zoom in">⊕</button>
+        <button class="icon-button" aria-label="Fit">⛶</button>
+        <button class="icon-button" aria-label="Reset">↔</button>
+        <div class="mode-toggle" role="group" aria-label="Metric mode">
+          <button class="mode-button active" data-mode="line">Line Loading</button>
+          <button class="mode-button" data-mode="voltage"><span class="dot"></span>Voltage (pu)</button>
+        </div>
+        <button class="select-button">Labels: <strong>Auto</strong><span>⌄</span></button>
+      </section>
+
+      <section class="canvas-card" aria-label="Current grid topology">
+        <div class="summary-card" id="summary-card">
+          <div>Current Grid</div>
+          <strong id="scenario-label">Loading...</strong>
+          <span id="grid-health">Health --</span>
+        </div>
+        <svg id="topology" viewBox="0 0 1000 860" role="img" aria-label="Grid topology diagram">
+          <defs>
+            <filter id="line-glow" x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter id="red-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="5" result="blur" />
+              <feColorMatrix
+                in="blur"
+                type="matrix"
+                values="1 0 0 0 0.9 0 0.1 0 0 0.2 0 0 0.1 0 0.2 0 0 0 0.8 0"
+              />
+              <feMerge>
+                <feMergeNode />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <g id="edges"></g>
+          <g id="nodes"></g>
+          <g id="labels"></g>
+        </svg>
+        <aside id="details-panel" class="details-panel hidden" aria-live="polite"></aside>
+      </section>
+    </main>
+    <script src="/static/topology.js"></script>
+  </body>
+</html>
