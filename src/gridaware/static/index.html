@@ -4,37 +4,84 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>gridAware Topology</title>
-    <link rel="stylesheet" href="/static/topology.css?v=20260426-r5" />
+    <link rel="stylesheet" href="/static/topology.css?v=20260426-r23" />
   </head>
   <body>
     <main class="shell">
       <section class="toolbar" aria-label="Topology controls">
-        <button class="select-button">Layout: <strong>Radial</strong><span>⌄</span></button>
-        <button class="icon-button" aria-label="Zoom out">⌕</button>
-        <button class="icon-button" aria-label="Zoom in">⊕</button>
-        <button class="icon-button" aria-label="Fit">⛶</button>
-        <button class="icon-button" aria-label="Reset">↔</button>
-        <div class="mode-toggle" role="group" aria-label="Metric mode">
-          <button class="mode-button active" data-mode="line">Line Loading</button>
-          <button class="mode-button" data-mode="voltage"><span class="dot"></span>Voltage (pu)</button>
+        <div class="chip layout-chip">Layout · <strong>Radial</strong></div>
+        <div class="chip scenario-chip" id="scenario-chip">
+          <span class="chip-label">Scenario</span>
+          <strong id="scenario-label">Loading...</strong>
         </div>
-        <button class="select-button">Labels: <strong>Auto</strong><span>⌄</span></button>
+        <div class="mode-toggle" role="group" aria-label="Metric mode">
+          <button class="mode-button active" data-mode="line">Loading</button>
+          <button class="mode-button" data-mode="voltage"><span class="dot"></span>Voltage</button>
+        </div>
+        <button class="analyze-chip" id="analyze-chip" type="button">Analyze grid</button>
       </section>
 
-      <section class="canvas-card" aria-label="Current grid topology">
-        <div class="summary-card" id="summary-card">
-          <div>Current Grid</div>
-          <strong id="scenario-label">Loading...</strong>
-          <span id="grid-health">Health --</span>
-        </div>
-        <div id="topology-stage" class="topology-stage" role="img" aria-label="Grid topology diagram">
-          <div id="edge-layer" class="edge-layer"></div>
-          <div id="node-layer" class="node-layer"></div>
-          <div id="label-layer" class="label-layer"></div>
-        </div>
-        <aside id="details-panel" class="details-panel hidden" aria-live="polite"></aside>
-      </section>
+      <div class="workspace">
+        <section class="canvas-card" aria-label="Current grid topology">
+          <div id="topology-stage" class="topology-stage" role="img" aria-label="Grid topology diagram">
+            <div id="edge-layer" class="edge-layer"></div>
+            <div id="node-layer" class="node-layer"></div>
+            <div id="label-layer" class="label-layer"></div>
+          </div>
+          <aside id="legend" class="legend" aria-label="Legend">
+            <div class="legend-title">Legend</div>
+            <ul class="legend-list">
+              <li>
+                <span class="legend-icon legend-slack"></span>
+                <span class="legend-name">Source</span>
+                <span class="legend-desc">substation tap</span>
+              </li>
+              <li>
+                <span class="legend-icon legend-data-center"></span>
+                <span class="legend-name">DataCenter A</span>
+                <span class="legend-desc">primary ~1 MW load</span>
+              </li>
+              <li>
+                <span class="legend-icon legend-data-center"></span>
+                <span class="legend-name">Partner Facility</span>
+                <span class="legend-desc">companion load</span>
+              </li>
+              <li>
+                <span class="legend-icon legend-battery"></span>
+                <span class="legend-name">Battery</span>
+                <span class="legend-desc">on-site storage</span>
+              </li>
+              <li>
+                <span class="legend-icon legend-generator"></span>
+                <span class="legend-name">Generator</span>
+                <span class="legend-desc">backup generation</span>
+              </li>
+              <li>
+                <span class="legend-icon legend-reactive"></span>
+                <span class="legend-name">Reactive</span>
+                <span class="legend-desc">voltage support</span>
+              </li>
+              <li>
+                <span class="legend-icon legend-bus"></span>
+                <span class="legend-name">Node</span>
+                <span class="legend-desc">feeder bus</span>
+              </li>
+            </ul>
+          </aside>
+          <aside id="details-panel" class="details-panel hidden" aria-live="polite"></aside>
+        </section>
+        <aside id="analyzer-panel" class="analyzer-panel" data-state="idle" aria-label="Analyzer agent">
+          <header class="analyzer-head">
+            <span class="bracket">[</span>
+            <span class="wordmark">Analyzer · v0.1</span>
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="bracket">]</span>
+            <button class="close" id="analyzer-close" aria-label="Close analyzer">×</button>
+          </header>
+          <div class="analyzer-body" id="analyzer-body"></div>
+        </aside>
+      </div>
     </main>
-    <script src="/static/topology.js?v=20260426-r5"></script>
+    <script type="module" src="/static/topology.js?v=20260426-r23"></script>
   </body>
 </html>
