@@ -7,7 +7,7 @@ from gridaware.agents.simulator import (
     run_simulator_agent,
     simulator_tools,
 )
-from gridaware.scenarios import load_agent_scenario
+from gridaware.scenarios import load_agent_grid, load_agent_scenario
 from gridaware.tool_executor import GridToolRuntime
 
 
@@ -298,5 +298,71 @@ def test_simulator_translates_storage_discharge_to_battery_dispatch() -> None:
             "target_bus": None,
             "q_mvar": None,
             "mw": 0.25,
+        }
+    ]
+
+
+def test_simulator_translates_load_setpoint_to_curtailment_delta() -> None:
+    planner_report = PlannerReport.model_validate(
+        {
+            "scenario_id": "case33bw_data_center_spike_tricky",
+            "planning_summary": "Curtail DC_A to a lower setpoint.",
+            "primary_objectives": ["Reduce line_25 loading."],
+            "candidates": [
+                {
+                    "rank": 1,
+                    "action_sequence": [
+                        {
+                            "type": "adjust_load",
+                            "intent_summary": "Reduce DC_A load from 0.90 MW to 0.60 MW.",
+                            "from_dc": None,
+                            "to_dc": "DC_A",
+                            "battery_id": None,
+                            "generator_id": None,
+                            "target_dc": "DC_A",
+                            "dc": "DC_A",
+                            "resource_id": None,
+                            "target_bus": "DC_A",
+                            "q_mvar": None,
+                            "target_element": None,
+                            "control_asset": None,
+                            "setpoint": 0.60,
+                            "units": "MW",
+                            "mw": None,
+                        }
+                    ],
+                    "validation_passed": False,
+                    "validation_passed_checks": [],
+                    "target_violations": ["line_25"],
+                    "feasibility_checks": ["DC_A has 0.30 MW flexible load."],
+                    "expected_effect": "Reduce downstream current.",
+                    "rationale": "Curtailment should relieve the constrained corridor.",
+                    "risk_notes": [],
+                    "planner_confidence": "medium",
+                }
+            ],
+            "rejected_options": [],
+            "requires_simulation": True,
+        }
+    )
+
+    candidates, unsupported = _simulation_candidates(
+        planner_report, load_agent_grid("case33bw_data_center_spike_tricky")
+    )
+
+    assert unsupported == []
+    assert candidates[0]["action_intents"] == [
+        {
+            "type": "curtail_flexible_load",
+            "from_dc": None,
+            "to_dc": None,
+            "battery_id": None,
+            "generator_id": None,
+            "target_dc": None,
+            "dc": "DC_A",
+            "resource_id": None,
+            "target_bus": None,
+            "q_mvar": None,
+            "mw": 0.3,
         }
     ]

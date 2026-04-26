@@ -20,6 +20,7 @@ from gridaware.agents.responses_runner import (
     pydantic_strict_json_schema,
     run_responses_agent,
 )
+from gridaware.models import GridState
 from gridaware.tool_executor import GridToolRuntime
 
 
@@ -43,7 +44,7 @@ def run_simulator_agent(
         client=responses_client,
         model=model,
         system_prompt=SIMULATOR_SYSTEM_PROMPT,
-        user_prompt=_simulator_user_prompt(planner_report),
+        user_prompt=_simulator_user_prompt(planner_report, runtime.active_state),
         tools=simulator_tools(),
         runtime=runtime,
         text_format=json_schema_text_format(
@@ -60,8 +61,10 @@ def run_simulator_agent(
     )
 
 
-def _simulator_user_prompt(planner_report: PlannerReport) -> str:
-    simulation_candidates, unsupported_candidates = _simulation_candidates(planner_report)
+def _simulator_user_prompt(planner_report: PlannerReport, grid_state: GridState) -> str:
+    simulation_candidates, unsupported_candidates = _simulation_candidates(
+        planner_report, grid_state
+    )
     return (
         "Simulate every candidate in this PlannerReport. "
         "Call simulate_candidate_sequences exactly once using the exact simulation_candidates "
@@ -70,17 +73,19 @@ def _simulator_user_prompt(planner_report: PlannerReport) -> str:
         "candidate. Do not return final JSON until every candidate has a simulation result or "
         "validation failure. If unsupported_candidates is not empty, report those candidates as "
         "failed because they could not be translated to executable backend action_intents.\n\n"
-        "Original PlannerReport:\n"
-        f"{json.dumps(planner_report.model_dump(mode='json'), indent=2)}\n\n"
         "Tool arguments for simulate_candidate_sequences:\n"
         f"{json.dumps({'candidates': simulation_candidates}, indent=2)}\n\n"
         "Unsupported candidates:\n"
-        f"{json.dumps(unsupported_candidates, indent=2)}"
+        f"{json.dumps(unsupported_candidates, indent=2)}\n\n"
+        "Original PlannerReport for explanation context only. Do not use this object as tool "
+        "arguments:\n"
+        f"{json.dumps(planner_report.model_dump(mode='json'), indent=2)}"
     )
 
 
 def _simulation_candidates(
     planner_report: PlannerReport,
+    grid_state: GridState | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     simulation_candidates: list[dict[str, Any]] = []
     unsupported_candidates: list[dict[str, Any]] = []
@@ -89,7 +94,7 @@ def _simulation_candidates(
         action_intents: list[dict[str, Any]] = []
         unsupported_reasons: list[str] = []
         for intent in candidate.action_sequence:
-            translated = _to_backend_action_intent(intent)
+            translated = _to_backend_action_intent(intent, grid_state)
             if translated is None:
                 unsupported_reasons.append(
                     f"{intent.type}: no executable backend mapping for this planner action"
@@ -118,7 +123,9 @@ def _simulation_candidates(
     return simulation_candidates, unsupported_candidates
 
 
-def _to_backend_action_intent(intent: PlannerActionIntent) -> dict[str, Any] | None:
+def _to_backend_action_intent(
+    intent: PlannerActionIntent, grid_state: GridState | None = None
+) -> dict[str, Any] | None:
     action_type = _backend_action_type(intent.type)
     target_dc = _target_dc(intent)
 
@@ -154,9 +161,10 @@ def _to_backend_action_intent(intent: PlannerActionIntent) -> dict[str, Any] | N
             )
         case "curtail_flexible_load":
             dc = intent.dc or target_dc
-            if not dc or intent.mw is None:
+            mw = _curtail_mw(intent, grid_state, dc)
+            if not dc or mw is None:
                 return None
-            return _action_payload(action_type, dc=dc, mw=intent.mw)
+            return _action_payload(action_type, dc=dc, mw=mw)
         case "adjust_reactive_support":
             resource_id = intent.resource_id or _asset_id(intent)
             target_bus = intent.target_bus or intent.target_element or target_dc
@@ -185,6 +193,7 @@ def _backend_action_type(action_type: str) -> str | None:
         "discharge_battery": "dispatch_battery",
         "increase_local_generation": "increase_local_generation",
         "adjust_generation": "increase_local_generation",
+        "dispatch_generation": "increase_local_generation",
         "dispatch_generator": "increase_local_generation",
         "dispatch_local_generation": "increase_local_generation",
         "curtail_flexible_load": "curtail_flexible_load",
@@ -225,6 +234,20 @@ def _target_dc(intent: PlannerActionIntent) -> str | None:
 
 def _asset_id(intent: PlannerActionIntent) -> str | None:
     return intent.control_asset or intent.resource_id
+
+
+def _curtail_mw(
+    intent: PlannerActionIntent, grid_state: GridState | None, dc_id: str | None
+) -> float | None:
+    if intent.mw is not None:
+        return intent.mw
+    if intent.setpoint is None or grid_state is None or dc_id is None:
+        return None
+    data_center = next((item for item in grid_state.data_centers if item.id == dc_id), None)
+    if data_center is None:
+        return None
+    reduction = round(data_center.load_mw - intent.setpoint, 6)
+    return reduction if reduction > 0 else None
 
 
 def _candidate_id(candidate: PlannerCandidate) -> str:
