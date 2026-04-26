@@ -146,18 +146,34 @@ svg {
   color: var(--text);
 }
 
+.backbone-edge,
 .edge {
   stroke: rgba(141, 196, 255, 0.9);
   stroke-width: 4;
   fill: none;
   filter: url(#line-glow);
-  cursor: pointer;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 
+.backbone-edge {
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.edge {
+  cursor: pointer;
+  opacity: 0;
+  stroke-width: 14;
+  filter: none;
+}
+
 .edge.overloaded {
+  stroke: transparent;
+}
+
+.backbone-edge.overloaded {
   stroke: var(--red);
   stroke-width: 5;
   filter: url(#red-glow);

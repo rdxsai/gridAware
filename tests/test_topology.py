@@ -49,5 +49,7 @@ def test_topology_api_and_static_app_are_served() -> None:
     assert topology_response.json()["scenario_id"] == "case33bw_data_center_spike_tricky"
     assert app_response.status_code == 200
     assert "gridAware Topology" in app_response.text
+    assert "feeder-backbone" in app_response.text
+    assert "topology.js?v=20260426-r2" in app_response.text
     assert root_response.status_code == 200
     assert "gridAware Topology" in root_response.text

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>gridAware Topology</title>
-    <link rel="stylesheet" href="/static/topology.css" />
+    <link rel="stylesheet" href="/static/topology.css?v=20260426-r2" />
   </head>
   <body>
     <main class="shell">
@@ -49,6 +49,15 @@
               </feMerge>
             </filter>
           </defs>
+          <g id="feeder-backbone" aria-hidden="true">
+            <polyline class="backbone-edge" points="70,160 290,160 490,160" />
+            <polyline class="backbone-edge" points="290,160 290,290 480,290 635,290 790,290" />
+            <polyline class="backbone-edge" points="290,290 290,505 290,655 480,655" />
+            <polyline class="backbone-edge" points="290,290 400,290 400,405" />
+            <polyline class="backbone-edge" points="290,655 235,655 235,775" />
+            <polyline class="backbone-edge" points="480,655 680,655 680,775" />
+            <polyline class="backbone-edge overloaded" points="235,775 680,775" />
+          </g>
           <g id="edges"></g>
           <g id="nodes"></g>
           <g id="labels"></g>
@@ -56,6 +65,6 @@
         <aside id="details-panel" class="details-panel hidden" aria-live="polite"></aside>
       </section>
     </main>
-    <script src="/static/topology.js"></script>
+    <script src="/static/topology.js?v=20260426-r2"></script>
   </body>
 </html>
