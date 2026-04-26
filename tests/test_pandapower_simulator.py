@@ -173,6 +173,70 @@ def test_pandapower_simulator_reactive_sequence_resolves_hard_spike() -> None:
     assert line_25["loading_percent"] <= 100.0
 
 
+def test_pandapower_simulator_tricky_spike_requires_broad_sequence() -> None:
+    bundle = load_agent_scenario("case33bw_data_center_spike_tricky")
+    partial = simulate_action_sequence_on_pandapower(
+        bundle,
+        [
+            ActionIntent(type="curtail_flexible_load", dc="DC_A", mw=0.15),
+            ActionIntent(
+                type="dispatch_battery",
+                battery_id="BAT_A",
+                target_dc="DC_A",
+                mw=0.20,
+            ),
+            ActionIntent(
+                type="increase_local_generation",
+                generator_id="GEN_A",
+                target_dc="DC_A",
+                mw=0.20,
+            ),
+            ActionIntent(
+                type="adjust_reactive_support",
+                resource_id="VAR_A",
+                target_bus="DC_A",
+                q_mvar=0.20,
+            ),
+        ],
+    )
+    full = simulate_action_sequence_on_pandapower(
+        bundle,
+        [
+            ActionIntent(type="curtail_flexible_load", dc="DC_A", mw=0.15),
+            ActionIntent(type="shift_data_center_load", from_dc="DC_A", to_dc="DC_B", mw=0.15),
+            ActionIntent(
+                type="dispatch_battery",
+                battery_id="BAT_A",
+                target_dc="DC_A",
+                mw=0.20,
+            ),
+            ActionIntent(
+                type="increase_local_generation",
+                generator_id="GEN_A",
+                target_dc="DC_A",
+                mw=0.20,
+            ),
+            ActionIntent(
+                type="adjust_reactive_support",
+                resource_id="VAR_A",
+                target_bus="DC_A",
+                q_mvar=0.20,
+            ),
+        ],
+    )
+
+    assert partial["sequence_completed"] is True
+    assert {
+        (violation["type"], violation["element_id"])
+        for violation in partial["final_diff"]["remaining_violations"]
+    } == {
+        ("voltage_low", "DC_A"),
+    }
+    assert full["sequence_completed"] is True
+    assert full["final_diff"]["remaining_violations"] == []
+    assert full["final_state"]["grid_health_score"] > partial["final_state"]["grid_health_score"]
+
+
 def test_pandapower_simulator_sequence_stops_when_control_is_depleted() -> None:
     bundle = load_agent_scenario("case33bw_data_center_spike_hard")
     result = simulate_action_sequence_on_pandapower(

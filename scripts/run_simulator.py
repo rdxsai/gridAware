@@ -17,6 +17,7 @@ def main() -> None:
             "baseline_case33bw",
             "case33bw_data_center_spike",
             "case33bw_data_center_spike_hard",
+            "case33bw_data_center_spike_tricky",
             "mv_data_center_spike",
             "mv_renewable_drop",
             "mv_line_constraint",

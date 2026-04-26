@@ -83,3 +83,30 @@ def test_case33bw_data_center_spike_hard_is_tougher_than_default_spike() -> None
     assert hard.data_centers[0].flexible_mw == 0.25
     assert hard.batteries[0].available_mw == 0.25
     assert hard.local_generators[0].available_headroom_mw == 0.25
+
+
+def test_case33bw_data_center_spike_tricky_has_limited_controls() -> None:
+    hard = load_agent_grid("case33bw_data_center_spike_hard")
+    tricky = load_agent_grid("case33bw_data_center_spike_tricky")
+
+    hard_line_25 = next(line for line in hard.line_loadings if line.line == "line_25")
+    tricky_line_25 = next(line for line in tricky.line_loadings if line.line == "line_25")
+    hard_dc_a = next(voltage for voltage in hard.bus_voltages if voltage.bus == "DC_A")
+    tricky_dc_a = next(voltage for voltage in tricky.bus_voltages if voltage.bus == "DC_A")
+    dc_a = next(data_center for data_center in tricky.data_centers if data_center.id == "DC_A")
+    dc_b = next(data_center for data_center in tricky.data_centers if data_center.id == "DC_B")
+
+    assert tricky.metadata is not None
+    assert tricky.metadata.scenario_type == "data_center_demand_spike_tricky"
+    assert any(
+        "requiring the planner to choose how much to curtail versus shift" in item
+        for item in tricky.metadata.modifications
+    )
+    assert tricky_line_25.loading_percent > hard_line_25.loading_percent
+    assert tricky_dc_a.vm_pu < hard_dc_a.vm_pu
+    assert dc_a.load_mw == 0.90
+    assert dc_a.flexible_mw == 0.30
+    assert round(dc_b.max_load_mw - dc_b.load_mw, 3) == 0.15
+    assert tricky.batteries[0].available_mw == 0.20
+    assert tricky.local_generators[0].available_headroom_mw == 0.20
+    assert tricky.reactive_resources[0].available_mvar == 0.20

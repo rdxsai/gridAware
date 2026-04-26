@@ -24,6 +24,7 @@ AgentGridScenario = Literal[
     "baseline_case33bw",
     "case33bw_data_center_spike",
     "case33bw_data_center_spike_hard",
+    "case33bw_data_center_spike_tricky",
     "mv_data_center_spike",
     "mv_renewable_drop",
     "mv_line_constraint",
@@ -151,6 +152,8 @@ def _build_benchmark_grid(
         return _build_case33bw_data_center_spike()
     if scenario_id == "case33bw_data_center_spike_hard":
         return _build_case33bw_data_center_spike_hard()
+    if scenario_id == "case33bw_data_center_spike_tricky":
+        return _build_case33bw_data_center_spike_tricky()
     if scenario_id == "lv_edge_data_center":
         return _build_cigre_lv_grid()
     return _build_cigre_mv_grid(scenario_id)
@@ -342,6 +345,89 @@ def _build_case33bw_data_center_spike_hard() -> tuple[
         [Battery(id="BAT_A", zone="feeder_tail", available_mw=0.25)],
         [LocalGenerator(id="GEN_A", zone="feeder_tail", available_headroom_mw=0.25)],
         [ReactiveSupportSpec(resource_id="VAR_A", bus=32, zone="feeder_tail", available_mvar=0.10)],
+        ALLOWED_DATA_CENTER_VOLTAGE_ACTIONS.copy(),
+        metadata,
+    )
+
+
+def _build_case33bw_data_center_spike_tricky() -> tuple[
+    pp.pandapowerNet,
+    list[DataCenterSpec],
+    list[Battery],
+    list[LocalGenerator],
+    list[ReactiveSupportSpec],
+    list[str],
+    ScenarioMetadata,
+]:
+    net = pn.case33bw()
+    net.ext_grid.at[0, "vm_pu"] = 1.04
+    net.line.loc[net.line.in_service, "max_i_ka"] = 0.40
+
+    data_centers = [
+        DataCenterSpec(
+            data_center_id="DC_A",
+            bus=32,
+            zone="feeder_tail",
+            pp_load_mw=0.90,
+            pp_q_mvar=0.315,
+            display_load_mw=0.90,
+            flexible_mw=0.30,
+            max_load_mw=1.00,
+        ),
+        DataCenterSpec(
+            data_center_id="DC_B",
+            bus=21,
+            zone="mid_feeder",
+            pp_load_mw=0.50,
+            pp_q_mvar=0.16,
+            display_load_mw=0.50,
+            flexible_mw=0.10,
+            max_load_mw=0.65,
+        ),
+    ]
+
+    for data_center in data_centers:
+        data_center.load_index = pp.create_load(
+            net,
+            bus=data_center.bus,
+            p_mw=data_center.pp_load_mw,
+            q_mvar=data_center.pp_q_mvar,
+            name=data_center.data_center_id,
+        )
+
+    net.line.at[24, "max_i_ka"] = 0.075
+    metadata = ScenarioMetadata(
+        scenario_id="case33bw_data_center_spike_tricky",
+        base_network="pandapower.networks.case33bw()",
+        scenario_type="data_center_demand_spike_tricky",
+        purpose=(
+            "Stress-test whether the agent can combine limited data-center flexibility, "
+            "storage, generation, and reactive support instead of relying on one obvious action."
+        ),
+        modifications=[
+            "Started from pandapower.networks.case33bw().",
+            "Set the substation voltage setpoint to 1.04 pu to represent normal feeder voltage support before the spike.",
+            "Set active feeder line ampacity to 0.40 kA because the benchmark default ampacity is not calibrated for operational loading comparisons.",
+            "Added DC_A at downstream bus 32 with 0.90 MW / 0.315 MVAr demand.",
+            "Limited DC_A flexible load to 0.30 MW, requiring the planner to choose how much to curtail versus shift.",
+            "Added DC_B at mid-feeder bus 21 with 0.50 MW / 0.16 MVAr demand and only 0.15 MW receiving headroom.",
+            "Added BAT_A in the feeder_tail zone with 0.20 MW available.",
+            "Added GEN_A in the feeder_tail zone with 0.20 MW available headroom.",
+            "Added VAR_A in the feeder_tail zone with 0.20 MVAr reactive support available.",
+            "Set line_25 ampacity to 0.075 kA to represent a tighter constrained upstream feeder corridor.",
+        ],
+        limitations=[
+            "Benchmark-based synthetic scenario, not a real utility feeder.",
+            "Data-center and flexibility assets are synthetic additions.",
+            "This variant is intentionally tricky: partial action sequences improve the grid but do not clear all constraints.",
+        ],
+    )
+    return (
+        net,
+        data_centers,
+        [Battery(id="BAT_A", zone="feeder_tail", available_mw=0.20)],
+        [LocalGenerator(id="GEN_A", zone="feeder_tail", available_headroom_mw=0.20)],
+        [ReactiveSupportSpec(resource_id="VAR_A", bus=32, zone="feeder_tail", available_mvar=0.20)],
         ALLOWED_DATA_CENTER_VOLTAGE_ACTIONS.copy(),
         metadata,
     )
