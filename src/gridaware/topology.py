@@ -72,6 +72,22 @@ BUS_COORDINATES = {
     "bus_13": (680, 775),
 }
 
+DISPLAY_BUS_TO_PP_INDEX = {
+    "bus_1": 0,
+    "bus_2": 1,
+    "bus_3": 2,
+    "bus_4": 3,
+    "bus_5": 4,
+    "bus_6": 5,
+    "bus_7": 6,
+    "bus_8": 7,
+    "bus_9": 8,
+    "bus_10": 9,
+    "bus_11": 10,
+    "bus_12": 32,
+    "bus_13": 21,
+}
+
 DISPLAY_EDGES = [
     ("line_display_1", "bus_1", "bus_2", ["bus_1", "bus_2"]),
     ("line_display_2", "bus_2", "bus_3", ["bus_2", "bus_3"]),
@@ -79,13 +95,12 @@ DISPLAY_EDGES = [
     ("line_display_4", "bus_4", "bus_5", ["bus_4", "bus_5"]),
     ("line_display_5", "bus_5", "bus_6", ["bus_5", "bus_6"]),
     ("line_display_6", "bus_6", "bus_7", ["bus_6", "bus_7"]),
-    ("line_display_7", "bus_4", "bus_8", ["bus_4", "bus_8"]),
+    ("line_25", "bus_4", "bus_8", ["bus_4", "bus_8"]),
     ("line_display_8", "bus_4", "bus_9", ["bus_4", "junction_4_9", "bus_9"]),
     ("line_display_9", "bus_8", "bus_10", ["bus_8", "bus_10"]),
     ("line_display_10", "bus_10", "bus_11", ["bus_10", "bus_11"]),
     ("line_display_11", "bus_10", "bus_12", ["bus_10", "junction_10_12", "bus_12"]),
     ("line_display_12", "bus_11", "bus_13", ["bus_11", "junction_11_13", "bus_13"]),
-    ("line_25", "bus_12", "bus_13", ["bus_12", "bus_13"]),
 ]
 
 ROUTE_POINTS = {
@@ -100,6 +115,13 @@ def build_current_topology_view(
     scenario_id: AgentGridScenario = "case33bw_data_center_spike_tricky",
 ) -> CurrentTopologyView:
     bundle = load_agent_scenario(scenario_id)
+    return build_topology_view_from_bundle(bundle, scenario_id)
+
+
+def build_topology_view_from_bundle(
+    bundle: ScenarioBundle,
+    scenario_id: AgentGridScenario,
+) -> CurrentTopologyView:
     generated_at = datetime.now().strftime("%I:%M:%S %p").lstrip("0")
     return CurrentTopologyView(
         scenario_id=scenario_id,
@@ -118,18 +140,22 @@ def build_current_topology_view(
 
 
 def _topology_nodes(bundle: ScenarioBundle) -> list[TopologyNode]:
+    voltages = {
+        display_id: round(float(bundle.net.res_bus.at[pp_index, "vm_pu"]), 3)
+        for display_id, pp_index in DISPLAY_BUS_TO_PP_INDEX.items()
+    }
     nodes = [
-        _node("bus_1", "slack", "SLACK", "Bus 1", "normal", {"role": "reference source"}),
-        _node("bus_2", "bus", "Bus 2", "Bus 2", "normal", {}),
+        _node("bus_1", "slack", "SLACK", "Bus 1", "normal", {"role": "reference source"}, voltages),
+        _node("bus_2", "bus", "Bus 2", "Bus 2", "normal", {}, voltages),
         _asset_node("GEN_A", "generator", "GEN_A", "Bus 3", "bus_3", bundle),
-        _node("bus_4", "bus", "Bus 4", "Bus 4", "normal", {}),
-        _node("bus_5", "bus", "Bus 5", "Bus 5", "normal", {}),
-        _node("bus_6", "bus", "Bus 6", "Bus 6", "normal", {}),
+        _node("bus_4", "bus", "Bus 4", "Bus 4", "normal", {}, voltages),
+        _node("bus_5", "bus", "Bus 5", "Bus 5", "normal", {}, voltages),
+        _node("bus_6", "bus", "Bus 6", "Bus 6", "normal", {}, voltages),
         _asset_node("VAR_A", "reactive_support", "VAR_A", "Bus 7", "bus_7", bundle),
         _asset_node("BAT_A", "battery", "BAT_A", "Bus 8", "bus_8", bundle),
-        _node("bus_9", "bus", "Bus 9", "Bus 9", "normal", {}),
-        _node("bus_10", "bus", "Bus 10", "Bus 10", "normal", {}),
-        _node("bus_11", "bus", "Bus 11", "Bus 11", "normal", {}),
+        _node("bus_9", "bus", "Bus 9", "Bus 9", "normal", {}, voltages),
+        _node("bus_10", "bus", "Bus 10", "Bus 10", "normal", {}, voltages),
+        _node("bus_11", "bus", "Bus 11", "Bus 11", "normal", {}, voltages),
         _data_center_node("DC_A", "Bus 12", "bus_12", bundle),
         _data_center_node("DC_B", "Bus 13", "bus_13", bundle),
     ]
@@ -152,8 +178,13 @@ def _node(
     bus: str,
     status: TopologyStatus,
     details: dict[str, Any],
+    voltages: dict[str, float] | None = None,
 ) -> TopologyNode:
     x, y = BUS_COORDINATES[node_id]
+    voltage_pu = voltages.get(node_id) if voltages else None
+    enriched = {**details}
+    if voltage_pu is not None:
+        enriched["voltage_pu"] = round(float(voltage_pu), 3)
     return TopologyNode(
         id=node_id,
         kind=kind,
@@ -161,8 +192,8 @@ def _node(
         bus=bus,
         x=x,
         y=y,
-        status=status,
-        details={"status": _status_label(status), **details},
+        status="normal",
+        details=enriched,
     )
 
 
@@ -193,7 +224,7 @@ def _asset_node(
         x=x,
         y=y,
         status="normal",
-        details={"status": "Available", **details},
+        details=details,
     )
 
 
@@ -207,7 +238,6 @@ def _data_center_node(
     voltage = next(
         item.vm_pu for item in bundle.grid_state.bus_voltages if item.bus == data_center_id
     )
-    status: TopologyStatus = "violation" if voltage < 0.95 else "normal"
     x, y = BUS_COORDINATES[coordinate_key]
     return TopologyNode(
         id=data_center_id,
@@ -216,9 +246,8 @@ def _data_center_node(
         bus=bus,
         x=x,
         y=y,
-        status=status,
+        status="normal",
         details={
-            "status": _status_label(status),
             "load_mw": data_center.load_mw,
             "voltage_pu": voltage,
             "flexible_mw": data_center.flexible_mw,
@@ -237,7 +266,6 @@ def _display_edge(edge_id: str, from_node: str, to_node: str, route: list[str]) 
         status="normal",
         loading_percent=None,
         details={
-            "status": "In Service",
             "from": _bus_label(from_node),
             "to": _bus_label(to_node),
             "route": _route_coordinates(route),
@@ -250,13 +278,11 @@ def _line_25_edge(bundle: ScenarioBundle, route: list[str], generated_at: str) -
     line = bundle.net.line.loc[line_index]
     result = bundle.net.res_line.loc[line_index]
     loading_percent = round(float(result.loading_percent), 1)
-    status: TopologyStatus = "overloaded" if loading_percent > 100 else "normal"
     current_ka = round(float(result.i_ka), 3)
     limit_ka = round(float(line.max_i_ka), 3)
     details = {
-        "from": "Bus 12",
-        "to": "Bus 13",
-        "status": "In Service" if bool(line.in_service) else "Out of Service",
+        "from": "Bus 4",
+        "to": "Bus 8",
         "loading_percent": loading_percent,
         "current_ka": current_ka,
         "limit_ka": limit_ka,
@@ -269,10 +295,10 @@ def _line_25_edge(bundle: ScenarioBundle, route: list[str], generated_at: str) -
     }
     return TopologyEdge(
         id="line_25",
-        from_node="bus_12",
-        to_node="bus_13",
+        from_node="bus_4",
+        to_node="bus_8",
         label="line_25",
-        status=status,
+        status="normal",
         loading_percent=loading_percent,
         details=details,
     )
@@ -291,15 +317,3 @@ def _route_coordinates(route: list[str]) -> list[dict[str, float]]:
 
 def _bus_label(node_id: str) -> str:
     return "Bus " + node_id.rsplit("_", 1)[-1]
-
-
-def _status_label(status: TopologyStatus) -> str:
-    match status:
-        case "violation":
-            return "Violation"
-        case "overloaded":
-            return "Overloaded"
-        case "warning":
-            return "Warning"
-        case _:
-            return "Normal"
