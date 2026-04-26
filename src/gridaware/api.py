@@ -25,6 +25,11 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/", response_class=HTMLResponse)
+def root_app() -> str:
+    return _topology_app_html()
+
+
 @app.post("/scenario/reset", response_model=GridState)
 def reset_scenario() -> GridState:
     global _active_state
@@ -46,6 +51,10 @@ def get_current_topology(
 
 @app.get("/app", response_class=HTMLResponse)
 def topology_app() -> str:
+    return _topology_app_html()
+
+
+def _topology_app_html() -> str:
     return (STATIC_DIR / "index.html").read_text()
 
 

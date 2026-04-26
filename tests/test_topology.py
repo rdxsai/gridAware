@@ -35,8 +35,11 @@ def test_topology_api_and_static_app_are_served() -> None:
 
     topology_response = client.get("/grid/topology/current")
     app_response = client.get("/app")
+    root_response = client.get("/")
 
     assert topology_response.status_code == 200
     assert topology_response.json()["scenario_id"] == "case33bw_data_center_spike_tricky"
     assert app_response.status_code == 200
     assert "gridAware Topology" in app_response.text
+    assert root_response.status_code == 200
+    assert "gridAware Topology" in root_response.text
