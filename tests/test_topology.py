@@ -28,6 +28,14 @@ def test_current_topology_view_contains_clickable_assets_and_overloaded_line() -
     assert line_25.details["from"] == "Bus 12"
     assert line_25.details["to"] == "Bus 13"
     assert line_25.details["line_type"] == "OH"
+    assert line_25.details["route"] == [{"x": 235, "y": 775}, {"x": 680, "y": 775}]
+
+    bus_10_to_12 = next(edge for edge in view.edges if edge.id == "line_display_11")
+    assert bus_10_to_12.details["route"] == [
+        {"x": 290, "y": 655},
+        {"x": 235, "y": 655},
+        {"x": 235, "y": 775},
+    ]
 
 
 def test_topology_api_and_static_app_are_served() -> None:

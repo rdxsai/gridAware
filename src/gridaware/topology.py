@@ -73,20 +73,27 @@ BUS_COORDINATES = {
 }
 
 DISPLAY_EDGES = [
-    ("line_display_1", "bus_1", "bus_2"),
-    ("line_display_2", "bus_2", "bus_3"),
-    ("line_display_3", "bus_2", "bus_4"),
-    ("line_display_4", "bus_4", "bus_5"),
-    ("line_display_5", "bus_5", "bus_6"),
-    ("line_display_6", "bus_6", "bus_7"),
-    ("line_display_7", "bus_4", "bus_8"),
-    ("line_display_8", "bus_4", "bus_9"),
-    ("line_display_9", "bus_8", "bus_10"),
-    ("line_display_10", "bus_10", "bus_11"),
-    ("line_display_11", "bus_10", "bus_12"),
-    ("line_display_12", "bus_11", "bus_13"),
-    ("line_25", "bus_12", "bus_13"),
+    ("line_display_1", "bus_1", "bus_2", ["bus_1", "bus_2"]),
+    ("line_display_2", "bus_2", "bus_3", ["bus_2", "bus_3"]),
+    ("line_display_3", "bus_2", "bus_4", ["bus_2", "bus_4"]),
+    ("line_display_4", "bus_4", "bus_5", ["bus_4", "bus_5"]),
+    ("line_display_5", "bus_5", "bus_6", ["bus_5", "bus_6"]),
+    ("line_display_6", "bus_6", "bus_7", ["bus_6", "bus_7"]),
+    ("line_display_7", "bus_4", "bus_8", ["bus_4", "bus_8"]),
+    ("line_display_8", "bus_4", "bus_9", ["bus_4", "junction_4_9", "bus_9"]),
+    ("line_display_9", "bus_8", "bus_10", ["bus_8", "bus_10"]),
+    ("line_display_10", "bus_10", "bus_11", ["bus_10", "bus_11"]),
+    ("line_display_11", "bus_10", "bus_12", ["bus_10", "junction_10_12", "bus_12"]),
+    ("line_display_12", "bus_11", "bus_13", ["bus_11", "junction_11_13", "bus_13"]),
+    ("line_25", "bus_12", "bus_13", ["bus_12", "bus_13"]),
 ]
+
+ROUTE_POINTS = {
+    **BUS_COORDINATES,
+    "junction_4_9": (400, 290),
+    "junction_10_12": (235, 655),
+    "junction_11_13": (680, 655),
+}
 
 
 def build_current_topology_view(
@@ -131,10 +138,10 @@ def _topology_nodes(bundle: ScenarioBundle) -> list[TopologyNode]:
 
 def _topology_edges(bundle: ScenarioBundle, generated_at: str) -> list[TopologyEdge]:
     return [
-        _line_25_edge(bundle, generated_at)
+        _line_25_edge(bundle, route, generated_at)
         if edge_id == "line_25"
-        else _display_edge(edge_id, from_node, to_node)
-        for edge_id, from_node, to_node in DISPLAY_EDGES
+        else _display_edge(edge_id, from_node, to_node, route)
+        for edge_id, from_node, to_node, route in DISPLAY_EDGES
     ]
 
 
@@ -221,7 +228,7 @@ def _data_center_node(
     )
 
 
-def _display_edge(edge_id: str, from_node: str, to_node: str) -> TopologyEdge:
+def _display_edge(edge_id: str, from_node: str, to_node: str, route: list[str]) -> TopologyEdge:
     return TopologyEdge(
         id=edge_id,
         from_node=from_node,
@@ -233,11 +240,12 @@ def _display_edge(edge_id: str, from_node: str, to_node: str) -> TopologyEdge:
             "status": "In Service",
             "from": _bus_label(from_node),
             "to": _bus_label(to_node),
+            "route": _route_coordinates(route),
         },
     )
 
 
-def _line_25_edge(bundle: ScenarioBundle, generated_at: str) -> TopologyEdge:
+def _line_25_edge(bundle: ScenarioBundle, route: list[str], generated_at: str) -> TopologyEdge:
     line_index = 24
     line = bundle.net.line.loc[line_index]
     result = bundle.net.res_line.loc[line_index]
@@ -257,6 +265,7 @@ def _line_25_edge(bundle: ScenarioBundle, generated_at: str) -> TopologyEdge:
         "length_km": round(float(line.length_km), 2),
         "line_type": _line_type(line),
         "last_updated": generated_at,
+        "route": _route_coordinates(route),
     }
     return TopologyEdge(
         id="line_25",
@@ -274,6 +283,10 @@ def _line_type(line: Any) -> str:
     if "cable" in std_type.lower():
         return "UG"
     return "OH"
+
+
+def _route_coordinates(route: list[str]) -> list[dict[str, float]]:
+    return [{"x": ROUTE_POINTS[item][0], "y": ROUTE_POINTS[item][1]} for item in route]
 
 
 def _bus_label(node_id: str) -> str:

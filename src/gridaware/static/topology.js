@@ -44,23 +44,24 @@ function renderEdge(edge, nodesById) {
   const to = nodesById.get(edge.to_node);
   if (!from || !to) return;
 
-  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  line.setAttribute("x1", from.x);
-  line.setAttribute("y1", from.y);
-  line.setAttribute("x2", to.x);
-  line.setAttribute("y2", to.y);
-  line.classList.add("edge");
-  if (edge.status === "overloaded") line.classList.add("overloaded");
-  line.dataset.id = edge.id;
-  line.addEventListener("click", (event) => {
+  const route = edge.details.route || [
+    { x: from.x, y: from.y },
+    { x: to.x, y: to.y },
+  ];
+  const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  polyline.setAttribute("points", route.map((point) => `${point.x},${point.y}`).join(" "));
+  polyline.classList.add("edge");
+  if (edge.status === "overloaded") polyline.classList.add("overloaded");
+  polyline.dataset.id = edge.id;
+  polyline.addEventListener("click", (event) => {
     event.stopPropagation();
     selectItem("edge", edge);
   });
-  edgeLayer.appendChild(line);
+  edgeLayer.appendChild(polyline);
 
   if (edge.id === "line_25") {
-    const midX = (from.x + to.x) / 2;
-    const midY = (from.y + to.y) / 2;
+    const midX = (route[0].x + route.at(-1).x) / 2;
+    const midY = (route[0].y + route.at(-1).y) / 2;
     labelLayer.appendChild(text(midX, midY + 42, "line_25", "line-label"));
     labelLayer.appendChild(text(midX, midY + 72, `${edge.loading_percent}%`, "line-value"));
   }

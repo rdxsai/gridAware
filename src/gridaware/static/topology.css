@@ -152,6 +152,9 @@ svg {
   fill: none;
   filter: url(#line-glow);
   cursor: pointer;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
 .edge.overloaded {
