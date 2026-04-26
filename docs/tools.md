@@ -69,6 +69,21 @@ No parameters.
 Returns the allowed mitigation action types and controllable assets. The planner uses this to reason
 about feasibility before proposing structured action intents.
 
+### `build_candidate_archetypes`
+
+No parameters.
+
+Returns non-physics planner search scaffolding:
+
+- `primitive_action_inventory`: feasible primitive backend-shaped intents available in the current scenario.
+- `candidate_archetypes`: required candidate shapes such as `minimal_candidate`,
+  `thermal_first_candidate`, `voltage_first_candidate`, `balanced_candidate`, and
+  `max_feasible_composite_candidate`.
+- `severity_triggers`: whether the current grid is severe enough to require a max-feasible composite.
+
+This tool does not simulate outcomes. The planner must still call `validate_action_intent` for every
+action it includes in final candidates.
+
 ### `validate_action_intent`
 
 Parameters:

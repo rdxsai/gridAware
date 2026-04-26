@@ -44,6 +44,7 @@ Allowed tools:
 
 - `get_grid_state`
 - `get_available_controls`
+- `build_candidate_archetypes`
 - `validate_action_intent`
 
 Forbidden tools:
@@ -57,6 +58,9 @@ Forbidden tools:
 Output:
 
 - `PlannerReport` from `src/gridaware/agents/models.py`
+- `primitive_action_inventory` lists feasible primitive controls inspected before candidate ranking.
+- Each candidate includes an explicit archetype: `minimal_candidate`, `thermal_first_candidate`,
+  `voltage_first_candidate`, `balanced_candidate`, or `max_feasible_composite_candidate`.
 - Each candidate includes a structured `action_sequence`; one-step sequences are valid.
 - Each candidate includes explicit `feasibility_checks` using numbers from grid/control state.
 - `requires_simulation` must be `true`.
@@ -69,8 +73,11 @@ GridOrchestrator.run_planner(...)
   -> GridToolRuntime(...)
   -> run_analyzer_agent(...)
   -> run_planner_agent(...)
-  -> planner calls get_grid_state, get_available_controls, and validate_action_intent
-  -> validate PlannerReport
+  -> planner calls get_grid_state, get_available_controls, build_candidate_archetypes,
+     and validate_action_intent
+  -> deterministic planner coverage check
+  -> one repair pass if required archetypes or max-composite coverage are missing
+  -> validate PlannerReport schema
 ```
 
 ## Simulator Agent
