@@ -50,6 +50,8 @@ def test_topology_api_and_static_app_are_served() -> None:
     assert app_response.status_code == 200
     assert "gridAware Topology" in app_response.text
     assert "feeder-backbone" in app_response.text
-    assert "topology.js?v=20260426-r2" in app_response.text
+    assert 'x1="70" y1="160" x2="290" y2="160"' in app_response.text
+    assert 'x1="290" y1="160" x2="490" y2="160"' in app_response.text
+    assert "topology.js?v=20260426-r3" in app_response.text
     assert root_response.status_code == 200
     assert "gridAware Topology" in root_response.text
