@@ -62,6 +62,18 @@ def responses_tool_definitions() -> list[dict[str, Any]]:
         },
         {
             "type": "function",
+            "name": "build_candidate_archetypes",
+            "description": (
+                "Build non-physics candidate construction scaffolding from the current grid and "
+                "available controls. Returns primitive feasible action intents and required "
+                "candidate archetypes, including a max feasible composite when the scenario is "
+                "severe. This does not simulate or predict power-flow outcomes."
+            ),
+            "parameters": _empty_parameters(),
+            "strict": True,
+        },
+        {
+            "type": "function",
             "name": "validate_action_intent",
             "description": (
                 "Run deterministic backend feasibility checks for a drafted mitigation action "

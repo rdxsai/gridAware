@@ -119,9 +119,11 @@ def test_simulator_agent_uses_action_sequence_tool() -> None:
             "scenario_id": "mv_data_center_spike",
             "planning_summary": "Test simulation.",
             "primary_objectives": ["Restore DC_A voltage."],
+            "primitive_action_inventory": [],
             "candidates": [
                 {
                     "rank": 1,
+                    "archetype": "minimal_candidate",
                     "action_sequence": [
                         {
                             "type": "curtail_flexible_load",
@@ -174,12 +176,14 @@ def test_simulator_translates_conceptual_generation_to_backend_action() -> None:
             "scenario_id": "case33bw_data_center_spike_hard",
             "planning_summary": "Use local generation near DC_A.",
             "primary_objectives": ["Reduce line_25 loading."],
+            "primitive_action_inventory": [],
             "candidates": [
                 {
                     "rank": 2,
+                    "archetype": "minimal_candidate",
                     "action_sequence": [
                         {
-                            "type": "adjust_generation",
+                            "type": "increase_local_generation",
                             "intent_summary": "Dispatch local generation near DC_A.",
                             "from_dc": None,
                             "to_dc": None,
@@ -244,12 +248,14 @@ def test_simulator_translates_storage_discharge_to_battery_dispatch() -> None:
             "scenario_id": "case33bw_data_center_spike_hard",
             "planning_summary": "Use battery support near DC_A.",
             "primary_objectives": ["Reduce line_25 loading."],
+            "primitive_action_inventory": [],
             "candidates": [
                 {
                     "rank": 1,
+                    "archetype": "minimal_candidate",
                     "action_sequence": [
                         {
-                            "type": "adjust_storage_discharge",
+                            "type": "dispatch_battery",
                             "intent_summary": "Discharge battery near DC_A.",
                             "from_dc": None,
                             "to_dc": "DC_A",
@@ -308,12 +314,14 @@ def test_simulator_translates_adjust_battery_dispatch_alias() -> None:
             "scenario_id": "case33bw_data_center_spike_tricky",
             "planning_summary": "Use battery support near DC_A.",
             "primary_objectives": ["Reduce line_25 loading."],
+            "primitive_action_inventory": [],
             "candidates": [
                 {
                     "rank": 1,
+                    "archetype": "minimal_candidate",
                     "action_sequence": [
                         {
-                            "type": "adjust_battery_dispatch",
+                            "type": "dispatch_battery",
                             "intent_summary": "Discharge battery near DC_A.",
                             "from_dc": None,
                             "to_dc": None,
@@ -358,12 +366,14 @@ def test_simulator_translates_adjust_local_generation_alias() -> None:
             "scenario_id": "case33bw_data_center_spike_tricky",
             "planning_summary": "Use local generation near DC_A.",
             "primary_objectives": ["Reduce line_25 loading."],
+            "primitive_action_inventory": [],
             "candidates": [
                 {
                     "rank": 1,
+                    "archetype": "minimal_candidate",
                     "action_sequence": [
                         {
-                            "type": "adjust_local_generation",
+                            "type": "increase_local_generation",
                             "intent_summary": "Dispatch local generation near DC_A.",
                             "from_dc": None,
                             "to_dc": None,
@@ -408,12 +418,14 @@ def test_simulator_translates_load_setpoint_to_curtailment_delta() -> None:
             "scenario_id": "case33bw_data_center_spike_tricky",
             "planning_summary": "Curtail DC_A to a lower setpoint.",
             "primary_objectives": ["Reduce line_25 loading."],
+            "primitive_action_inventory": [],
             "candidates": [
                 {
                     "rank": 1,
+                    "archetype": "minimal_candidate",
                     "action_sequence": [
                         {
-                            "type": "adjust_load",
+                            "type": "curtail_flexible_load",
                             "intent_summary": "Reduce DC_A load from 0.90 MW to 0.60 MW.",
                             "from_dc": None,
                             "to_dc": "DC_A",

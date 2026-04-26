@@ -1,4 +1,8 @@
-from gridaware.agents.models import PlannerReport
+import pytest
+
+from pydantic import ValidationError
+
+from gridaware.agents.models import PlannerActionIntent, PlannerReport
 
 
 def test_planner_report_schema_requires_ranked_action_sequences() -> None:
@@ -10,9 +14,33 @@ def test_planner_report_schema_requires_ranked_action_sequences() -> None:
                 "Reduce line_4 loading below 100 percent.",
                 "Restore DC_A voltage to at least 0.95 pu.",
             ],
+            "primitive_action_inventory": [
+                {
+                    "action_type": "shift_data_center_load",
+                    "target": "DC_A->DC_B",
+                    "max_value": 10.0,
+                    "units": "MW",
+                    "primary_effect": "thermal_and_voltage",
+                    "backend_action_intent": {
+                        "type": "shift_data_center_load",
+                        "from_dc": "DC_A",
+                        "to_dc": "DC_B",
+                        "battery_id": None,
+                        "generator_id": None,
+                        "target_dc": None,
+                        "dc": None,
+                        "resource_id": None,
+                        "target_bus": None,
+                        "q_mvar": None,
+                        "mw": 10.0,
+                    },
+                    "rationale": "DC_A can move flexible load to DC_B.",
+                }
+            ],
             "candidates": [
                 {
                     "rank": 1,
+                    "archetype": "minimal_candidate",
                     "action_sequence": [
                         {
                             "type": "shift_data_center_load",
@@ -57,3 +85,27 @@ def test_planner_report_schema_requires_ranked_action_sequences() -> None:
     assert report.requires_simulation is True
     assert report.candidates[0].action_sequence[0].from_dc == "DC_A"
     assert report.candidates[0].planner_confidence == "high"
+
+
+def test_planner_action_intent_rejects_action_aliases() -> None:
+    with pytest.raises(ValidationError):
+        PlannerActionIntent.model_validate(
+            {
+                "type": "adjust_load",
+                "intent_summary": "Alias should not be accepted.",
+                "from_dc": None,
+                "to_dc": None,
+                "battery_id": None,
+                "generator_id": None,
+                "target_dc": None,
+                "dc": "DC_A",
+                "resource_id": None,
+                "target_bus": None,
+                "q_mvar": None,
+                "target_element": "DC_A",
+                "control_asset": None,
+                "setpoint": None,
+                "units": "MW",
+                "mw": 0.1,
+            }
+        )

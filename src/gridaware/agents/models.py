@@ -73,12 +73,42 @@ class AnalyzerRunResult(BaseModel):
 
 
 PlannerConfidence = Literal["low", "medium", "high"]
+PlannerActionType = Literal[
+    "shift_data_center_load",
+    "dispatch_battery",
+    "increase_local_generation",
+    "curtail_flexible_load",
+    "adjust_reactive_support",
+]
+CandidateArchetype = Literal[
+    "minimal_candidate",
+    "thermal_first_candidate",
+    "voltage_first_candidate",
+    "balanced_candidate",
+    "max_feasible_composite_candidate",
+]
+
+
+class PlannerBackendActionIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: PlannerActionType
+    from_dc: str | None
+    to_dc: str | None
+    battery_id: str | None
+    generator_id: str | None
+    target_dc: str | None
+    dc: str | None
+    resource_id: str | None
+    target_bus: str | None
+    q_mvar: float | None
+    mw: float | None
 
 
 class PlannerActionIntent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: str
+    type: PlannerActionType
     intent_summary: str
     from_dc: str | None
     to_dc: str | None
@@ -96,10 +126,23 @@ class PlannerActionIntent(BaseModel):
     mw: float | None
 
 
+class PlannerPrimitiveAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action_type: PlannerActionType
+    target: str
+    max_value: float
+    units: str
+    primary_effect: str
+    backend_action_intent: PlannerBackendActionIntent
+    rationale: str
+
+
 class PlannerCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     rank: int
+    archetype: CandidateArchetype
     action_sequence: list[PlannerActionIntent]
     validation_passed: bool
     validation_passed_checks: list[str]
@@ -117,6 +160,7 @@ class PlannerReport(BaseModel):
     scenario_id: str
     planning_summary: str
     primary_objectives: list[str]
+    primitive_action_inventory: list[PlannerPrimitiveAction]
     candidates: list[PlannerCandidate]
     rejected_options: list[str]
     requires_simulation: bool

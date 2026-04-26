@@ -12,6 +12,7 @@ def test_responses_tool_definitions_are_strict() -> None:
         "get_grid_state",
         "propose_grid_actions",
         "get_available_controls",
+        "build_candidate_archetypes",
         "validate_action_intent",
         "simulate_action",
         "simulate_action_sequence",
@@ -140,6 +141,38 @@ def test_tool_runtime_returns_case33bw_scenario_specific_controls() -> None:
             "generator.available_headroom_mw",
         ],
     }
+
+
+def test_tool_runtime_builds_candidate_archetypes_for_tricky_case() -> None:
+    runtime = GridToolRuntime(
+        scenario_bundle=load_agent_scenario("case33bw_data_center_spike_tricky")
+    )
+
+    result = json.loads(runtime.execute("build_candidate_archetypes", {}))
+
+    assert result["ok"] is True
+    assert result["severity_triggers"]["requires_max_feasible_composite"] is True
+    assert {item["action_type"] for item in result["primitive_action_inventory"]} == {
+        "shift_data_center_load",
+        "dispatch_battery",
+        "increase_local_generation",
+        "curtail_flexible_load",
+        "adjust_reactive_support",
+    }
+    max_composite = next(
+        item
+        for item in result["candidate_archetypes"]
+        if item["archetype"] == "max_feasible_composite_candidate"
+    )
+    assert max_composite["candidate_shape"] == [
+        "shift_data_center_load",
+        "curtail_flexible_load",
+        "dispatch_battery",
+        "increase_local_generation",
+        "adjust_reactive_support",
+    ]
+    assert max_composite["action_intents"][0]["mw"] == 0.15
+    assert max_composite["action_intents"][1]["mw"] == 0.15
 
 
 def test_tool_runtime_returns_no_controls_for_untouched_case33bw_baseline() -> None:

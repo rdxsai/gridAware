@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from gridaware.actions import propose_grid_actions, validate_action_intent_for_planner
+from gridaware.candidate_builder import build_candidate_archetypes
 from gridaware.models import ActionIntent, Evaluation, GridState
 from gridaware.pandapower_simulator import (
     simulate_action_intent_on_pandapower,
@@ -53,6 +54,8 @@ class GridToolRuntime:
                     payload = self.propose_grid_actions(args["target_violation_id"])
                 case "get_available_controls":
                     payload = self.get_available_controls()
+                case "build_candidate_archetypes":
+                    payload = self.build_candidate_archetypes()
                 case "validate_action_intent":
                     payload = self.validate_action_intent(args["action_intent"])
                 case "simulate_action":
@@ -148,6 +151,19 @@ class GridToolRuntime:
             },
             "action_feasibility_policy": _action_feasibility_policy(),
         }
+
+    def build_candidate_archetypes(self) -> dict[str, Any]:
+        allowed_action_types = (
+            self.scenario_bundle.allowed_action_types
+            if self.scenario_bundle is not None
+            else [
+                "shift_data_center_load",
+                "dispatch_battery",
+                "increase_local_generation",
+                "curtail_flexible_load",
+            ]
+        )
+        return build_candidate_archetypes(self.active_state, allowed_action_types)
 
     def simulate_action(
         self, action_id: str | None, action_intent: dict[str, Any] | None

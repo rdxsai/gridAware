@@ -56,16 +56,29 @@ Inputs:
 - You must call get_grid_state to inspect current grid facts.
 - You must call get_available_controls to inspect scenario-specific allowed action types,
   controllable assets, and action_feasibility_policy.
+- You must call build_candidate_archetypes to construct primitive feasible actions and required
+  candidate archetypes before final output. This tool is a search aid only; it does not simulate.
 
 Required behavior:
 - Call get_grid_state before writing the final plan.
 - Call get_available_controls before writing the final plan.
+- Call build_candidate_archetypes before writing the final plan.
 - Target active violations before watchlist findings.
+- Populate primitive_action_inventory from build_candidate_archetypes.primitive_action_inventory.
 - Generate structured action_sequence arrays using only allowed_action_types returned by
   get_available_controls.
-- Include both single-step and multi-step sequence candidates when active violations are high or
-  critical, when more than one active violation exists, or when one control appears capacity-limited.
-- Multi-step sequence candidates should combine complementary controls that target the same active
+- For every candidate archetype returned by build_candidate_archetypes, create a corresponding
+  PlannerCandidate unless all actions in that archetype fail validation.
+- If build_candidate_archetypes.severity_triggers.requires_max_feasible_composite is true, final
+  candidates must include minimal_candidate, thermal_first_candidate, voltage_first_candidate,
+  balanced_candidate, and max_feasible_composite_candidate.
+- The max_feasible_composite_candidate must include every validated, non-conflicting available
+  control relevant to the active violations. Use maximum feasible values unless there is an explicit
+  operational reason to use less.
+- When one capability is shared across actions, avoid double-counting it. For example, if source data
+  center flexible load is split between shifting and curtailment, the combined MW must stay within
+  the source flexible_mw.
+- Multi-step sequence candidates must combine complementary controls that target the same active
   violations without duplicating the same exhausted capability.
 - For every action in every candidate sequence, call validate_action_intent with the exact
   backend-shaped action intent you plan to include.
@@ -95,8 +108,13 @@ Forbidden:
 
 Candidate guidance:
 - Every candidate must contain an action_sequence list with one or more action_intents.
-- For severe active violations, include at least one multi-step action_sequence if two or more
-  plausible controls could address the affected asset, zone, corridor, or constraint.
+- Every candidate must set archetype to one of: minimal_candidate, thermal_first_candidate,
+  voltage_first_candidate, balanced_candidate, max_feasible_composite_candidate.
+- For severe active violations, include the max_feasible_composite_candidate and at least one
+  focused alternative candidate.
+- For data-center overload plus low-voltage cases, check these controls in this order when
+  available: adjust_reactive_support, increase_local_generation, dispatch_battery,
+  shift_data_center_load, curtail_flexible_load.
 - Use exact backend action type names. For example, use curtail_flexible_load, not adjust_load;
   dispatch_battery, not dispatch_storage; increase_local_generation, not dispatch_generator.
 - For adjust_reactive_support, use resource_id, target_bus, and q_mvar. Set mw to null.
