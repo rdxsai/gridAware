@@ -6,6 +6,7 @@ from typing import Any
 from gridaware.agent_tools import responses_tool_definitions
 from gridaware.agents.models import (
     AgentRunTrace,
+    AgentToolCallTrace,
     AnalyzerReport,
     PlannerReport,
     PlannerRunResult,
@@ -19,7 +20,12 @@ from gridaware.agents.responses_runner import (
     pydantic_strict_json_schema,
     run_responses_agent,
 )
-from gridaware.planner_coverage import PlannerCoverageResult, check_planner_coverage
+from gridaware.planner_coverage import (
+    PlannerCoverageResult,
+    _planner_intent_signature,
+    _validated_intent_signatures,
+    check_planner_coverage,
+)
 from gridaware.tool_executor import GridToolRuntime
 
 
@@ -48,6 +54,7 @@ def run_planner_agent(
         _planner_user_prompt(analyzer_report),
     )
     report = _normalize_planner_report(PlannerReport.model_validate_json(result.output_text))
+    _backfill_missing_validations(report, runtime, result.trace)
     coverage = check_planner_coverage(
         report, runtime.active_state, runtime.get_available_controls(), result.trace
     )
@@ -63,13 +70,14 @@ def run_planner_agent(
     repaired_report = _normalize_planner_report(
         PlannerReport.model_validate_json(repair_result.output_text)
     )
+    trace = _merge_traces(result.trace, repair_result.trace)
+    _backfill_missing_validations(repaired_report, runtime, trace)
     repaired_coverage = check_planner_coverage(
         repaired_report,
         runtime.active_state,
         runtime.get_available_controls(),
-        repair_result.trace,
+        trace,
     )
-    trace = _merge_traces(result.trace, repair_result.trace)
     if not repaired_coverage.passed:
         issue_text = "; ".join(issue.message for issue in repaired_coverage.issues)
         raise RuntimeError(f"Planner coverage failed after repair: {issue_text}")
@@ -203,3 +211,58 @@ def _normalize_action_intent(intent):
                 }
             )
     return intent
+
+
+def _backfill_missing_validations(
+    report: PlannerReport,
+    runtime: GridToolRuntime,
+    trace: AgentRunTrace,
+) -> None:
+    """Append validate_action_intent tool calls for any final action_intents the LLM
+    skipped. The validation function is deterministic, so the result is identical to
+    what the LLM would have received if it had called the tool itself."""
+
+    required_intents: dict[str, Any] = {}
+    for candidate in report.candidates:
+        for intent in candidate.action_sequence:
+            signature = _planner_intent_signature(intent)
+            if signature not in required_intents:
+                required_intents[signature] = intent
+
+    already_validated = _validated_intent_signatures(trace)
+    missing = [
+        (signature, intent)
+        for signature, intent in required_intents.items()
+        if signature not in already_validated
+    ]
+    if not missing:
+        return
+
+    for signature, intent in missing:
+        backend_payload = {
+            "type": intent.type,
+            "from_dc": intent.from_dc,
+            "to_dc": intent.to_dc,
+            "battery_id": intent.battery_id,
+            "generator_id": intent.generator_id,
+            "target_dc": intent.target_dc,
+            "dc": intent.dc,
+            "resource_id": intent.resource_id,
+            "target_bus": intent.target_bus,
+            "q_mvar": intent.q_mvar,
+            "mw": intent.mw,
+        }
+        try:
+            output = runtime.validate_action_intent(backend_payload)
+        except Exception as exc:  # noqa: BLE001 - surface as a failed validation
+            output = {
+                "ok": False,
+                "validation": {"valid": False, "reason": f"backfill_error: {exc}"},
+            }
+        trace.tool_calls.append(
+            AgentToolCallTrace(
+                name="validate_action_intent",
+                arguments=json.dumps({"action_intent": backend_payload}, sort_keys=True),
+                output=json.dumps(output),
+            )
+        )
