@@ -16,6 +16,16 @@ from gridaware.scenarios import (
 )
 
 
+def _snapshot_metrics(state: GridState) -> dict[str, float | int]:
+    max_loading = max((line.loading_percent for line in state.line_loadings), default=0.0)
+    min_voltage = min((bus.vm_pu for bus in state.bus_voltages), default=1.0)
+    return {
+        "max_line_loading_percent": round(float(max_loading), 1),
+        "min_bus_voltage_pu": round(float(min_voltage), 3),
+        "grid_health_score": int(state.grid_health_score),
+    }
+
+
 def simulate_action_intent_on_pandapower(
     bundle: ScenarioBundle,
     intent: ActionIntent,
@@ -157,6 +167,97 @@ def simulate_action_sequence_on_pandapower(
         failed_step_index=None,
         error=None,
     )
+
+
+def execute_intents_capturing_bundle(
+    bundle: ScenarioBundle,
+    intents: list[ActionIntent],
+) -> tuple[ScenarioBundle, list[dict[str, Any]]]:
+    """Apply intents to a deep-copied bundle and return (post_action_bundle, step_results).
+
+    Each step_result includes per-step before/after snapshots (max_line_loading_percent,
+    min_bus_voltage_pu, grid_health_score) so callers can show per-action impact deltas.
+    """
+    if not intents:
+        raise ValueError("execute_intents_capturing_bundle requires at least one action_intent")
+
+    net = deepcopy(bundle.net)
+    data_centers = deepcopy(bundle.data_centers)
+    batteries = deepcopy(bundle.batteries)
+    local_generators = deepcopy(bundle.local_generators)
+    reactive_resources = deepcopy(bundle.reactive_resources)
+    current_state = bundle.grid_state
+    step_results: list[dict[str, Any]] = []
+
+    for step_index, intent in enumerate(intents, start=1):
+        before_snapshot = _snapshot_metrics(current_state)
+        validation = validate_action_intent(
+            current_state, intent, action_id=f"execute_step_{step_index}"
+        )
+        if not validation.valid:
+            step_results.append(
+                {
+                    "step_index": step_index,
+                    "intent": intent.model_dump(mode="json"),
+                    "applied": False,
+                    "error": validation.reason,
+                    "before": before_snapshot,
+                    "after": before_snapshot,
+                }
+            )
+            break
+
+        try:
+            _apply_intent_to_net(
+                net, data_centers, batteries, local_generators, reactive_resources, intent
+            )
+            pp.runpp(net, numba=False, max_iteration=30)
+        except (LoadflowNotConverged, ValueError) as exc:
+            step_results.append(
+                {
+                    "step_index": step_index,
+                    "intent": intent.model_dump(mode="json"),
+                    "applied": False,
+                    "error": str(exc),
+                    "before": before_snapshot,
+                    "after": before_snapshot,
+                }
+            )
+            break
+
+        current_state = _grid_state_from_pandapower(
+            net,
+            bundle.scenario_id,
+            data_centers,
+            batteries,
+            local_generators,
+            reactive_resources,
+            bundle.metadata,
+        )
+        after_snapshot = _snapshot_metrics(current_state)
+        step_results.append(
+            {
+                "step_index": step_index,
+                "intent": intent.model_dump(mode="json"),
+                "applied": True,
+                "error": None,
+                "before": before_snapshot,
+                "after": after_snapshot,
+            }
+        )
+
+    post_bundle = ScenarioBundle(
+        scenario_id=bundle.scenario_id,
+        net=net,
+        data_centers=data_centers,
+        batteries=batteries,
+        local_generators=local_generators,
+        reactive_resources=reactive_resources,
+        allowed_action_types=list(bundle.allowed_action_types),
+        metadata=bundle.metadata,
+        grid_state=current_state,
+    )
+    return post_bundle, step_results
 
 
 def simulate_candidate_sequences_on_pandapower(
