@@ -302,6 +302,106 @@ def test_simulator_translates_storage_discharge_to_battery_dispatch() -> None:
     ]
 
 
+def test_simulator_translates_adjust_battery_dispatch_alias() -> None:
+    planner_report = PlannerReport.model_validate(
+        {
+            "scenario_id": "case33bw_data_center_spike_tricky",
+            "planning_summary": "Use battery support near DC_A.",
+            "primary_objectives": ["Reduce line_25 loading."],
+            "candidates": [
+                {
+                    "rank": 1,
+                    "action_sequence": [
+                        {
+                            "type": "adjust_battery_dispatch",
+                            "intent_summary": "Discharge battery near DC_A.",
+                            "from_dc": None,
+                            "to_dc": None,
+                            "battery_id": "BAT_A",
+                            "generator_id": None,
+                            "target_dc": "DC_A",
+                            "dc": "DC_A",
+                            "resource_id": "BAT_A",
+                            "target_bus": "DC_A",
+                            "q_mvar": None,
+                            "target_element": None,
+                            "control_asset": "BAT_A",
+                            "setpoint": 0.20,
+                            "units": "MW",
+                            "mw": 0.20,
+                        }
+                    ],
+                    "validation_passed": False,
+                    "validation_passed_checks": [],
+                    "target_violations": ["line_25"],
+                    "feasibility_checks": ["BAT_A has 0.20 MW available."],
+                    "expected_effect": "Reduce upstream imports.",
+                    "rationale": "Battery near the tail should relieve the constrained corridor.",
+                    "risk_notes": [],
+                    "planner_confidence": "medium",
+                }
+            ],
+            "rejected_options": [],
+            "requires_simulation": True,
+        }
+    )
+
+    candidates, unsupported = _simulation_candidates(planner_report)
+
+    assert unsupported == []
+    assert candidates[0]["action_intents"][0]["type"] == "dispatch_battery"
+
+
+def test_simulator_translates_adjust_local_generation_alias() -> None:
+    planner_report = PlannerReport.model_validate(
+        {
+            "scenario_id": "case33bw_data_center_spike_tricky",
+            "planning_summary": "Use local generation near DC_A.",
+            "primary_objectives": ["Reduce line_25 loading."],
+            "candidates": [
+                {
+                    "rank": 1,
+                    "action_sequence": [
+                        {
+                            "type": "adjust_local_generation",
+                            "intent_summary": "Dispatch local generation near DC_A.",
+                            "from_dc": None,
+                            "to_dc": None,
+                            "battery_id": None,
+                            "generator_id": "GEN_A",
+                            "target_dc": "DC_A",
+                            "dc": "DC_A",
+                            "resource_id": "GEN_A",
+                            "target_bus": "DC_A",
+                            "q_mvar": None,
+                            "target_element": None,
+                            "control_asset": "GEN_A",
+                            "setpoint": 0.20,
+                            "units": "MW",
+                            "mw": 0.20,
+                        }
+                    ],
+                    "validation_passed": False,
+                    "validation_passed_checks": [],
+                    "target_violations": ["line_25"],
+                    "feasibility_checks": ["GEN_A has 0.20 MW headroom."],
+                    "expected_effect": "Reduce upstream imports.",
+                    "rationale": "Generation near the tail should relieve the constrained corridor.",
+                    "risk_notes": [],
+                    "planner_confidence": "medium",
+                }
+            ],
+            "rejected_options": [],
+            "requires_simulation": True,
+        }
+    )
+
+    candidates, unsupported = _simulation_candidates(planner_report)
+
+    assert unsupported == []
+    assert candidates[0]["action_intents"][0]["type"] == "increase_local_generation"
+
+
 def test_simulator_translates_load_setpoint_to_curtailment_delta() -> None:
     planner_report = PlannerReport.model_validate(
         {
